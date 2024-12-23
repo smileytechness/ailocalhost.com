@@ -1,206 +1,26 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="light">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="
-    AI Chat: Chat with Your Local AI Using ailocalhost.com
-    Unlock the power of AI with AI Chat — an intuitive, web-based interface that lets you easily interact with locally-hosted AI servers like Ollama, Jan.ai, vLLM, and LM Studio. No downloads, no logins, and no complex setup. Simply visit ailocalhost.com to start chatting with your local AI in seconds.
-    Key Features
-    * Seamless Browser Experience:AI Chat works directly in your browser without requiring you to install anything or run any additional services. It provides a clean and user-friendly graphical interface that connects to AI servers like Ollama, Jan.ai, vLLM, and LM Studio. No internet connection is necessary once the page is loaded—everything works locally on your local network (LAN).
-    * AI Server Diagnostics & Troubleshooting:Our web app provides clear, actionable feedback about the status of your locally-hosted AI server. It checks whether your browser can successfully connect to the server, whether it detects on your LAN, and whether any CORS issues are present. If there are problems, you'll receive step-by-step guidance on how to resolve them, including fixes for:
-        * MIXED CONTENT (HTTP) errors
-        * Ollama not responding on the LAN (OLLAMA_HOST)
-        * Ollama CORS issues (OLLAMA_HOST)
-    * No Account, No Backend—Privacy First:This web app is designed with your privacy in mind. It doesn't require you to create an account, and it doesn't rely on a backend server to store your data. All configurations and settings are saved in your browsers local storage, ensuring your preferences stay private and secure.
-    * Save and Load Configurations:Easily save and load different server configurations and API settings for quick access later. Whether you're tweaking advanced settings or switching between multiple setups, your preferences are just a click away. And because it uses your local storage, no personal data is sent to any external server.
-    * Powerful API Controls & Customization:Fine-tune your AI interactions with advanced API settings. AI Chat allows you to control:
-        * Model selection
-        * API key (optional)
-        * Streaming responses
-        * Temperature and other parameters
-        * Multimodal LLMs (Language Models) for image generation and more
-    Each setting comes with clear explanations and simple controls that make it easy for both beginners and experts to customize their experience. All settings can be saved for future use.
-    * Markdown Support & Clean Interface:Enjoy a modern, clean chat interface that supports rich Markdown formatting, making your conversations with AI more dynamic and engaging. Whether you're generating text, images, or other outputs, everything is displayed clearly and professionally.
-    Why Choose AI Chat?
-    AI Chat is the perfect solution for anyone who wants to interact with AI locally—without the hassle of complicated setups or worrying about privacy. Whether you're a developer, researcher, or hobbyist, our platform makes it simple to connect, configure, and chat with your local AI models.
-    Get started today at ailocalhost.com and experience the future of local AI chat.
-    ">
+    <meta charset="UTF-8" />
+    <link rel="icon" href="/ailhlogo.png" type="image/png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="AI Chat: Chat with Your Local AI Using ailocalhost.com..." />
     <title>ailocalhost.com - AI Chat GUI for Ollama and OpenAI-API servers. Private AI, Simplified</title>
-    <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
-    <link rel="icon" href="ailhlogo.png" type="image/png">
-</head>
-<body class="bg-gray-900 text-gray-200 font-sans">
-
-    <!-- Header -->
-    <header class="bg-gray-800 shadow-md fixed top-0 w-full z-50">
-        <div class="container mx-auto px-6 py-4 flex items-center justify-between">
-            <h1 class="text-2xl font-bold">
-                ai<span class="text-blue-400">local</span>host.com
-            </h1>
-            <nav class="hidden md:flex space-x-6">
-
-            </nav>
-            <button id="chatNowHeader" class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg transition">
-                Open Chat
-            </button>
-        </div>
-    </header>
-
-    <!-- Hero Section -->
-    <section class="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 text-center">
-        <div class="container mx-auto px-6">
-            <h1 class="text-4xl md:text-5xl font-extrabold mb-4">
-                Chat With Your Locally Hosted AI
-            </h1>
-            <p class="text-lg md:text-xl text-gray-400 mb-6">
-                Instantly chat with your locally hosted LLM server. Experience an AI Chat interface on your own terms. No downloads. No installs. No logins.
-            </p>
-            <a href="#features" class="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white font-semibold text-lg rounded-lg transition mb-4">
-                Discover the Features
-            </a>
-            <button id="chatNowMain" class="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white font-semibold text-lg rounded-lg transition ml-4">
-                Start Chat
-            </button>
-        </div>
-    </section>
-
-    <!-- Features Section -->
-    <section id="features" class="py-16 bg-gray-900">
-        <div class="container mx-auto px-6">
-            <h2 class="text-3xl font-bold text-center mb-10">Why Choose Our AI Chat?</h2>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <!-- Feature 1 -->
-                <div class="bg-gray-800 p-6 rounded-lg shadow-md text-center">
-                    <i class="fas fa-network-wired text-blue-400 text-4xl mb-4"></i>
-                    <h3 class="text-xl font-bold mb-2">Local First, No Internet Needed</h3>
-                    <p class="text-gray-400">
-                        Enjoy AI-powered interactions entirely on your local network. No need for an internet connection, ensuring maximum privacy and speed.
-                    </p>
-                </div>
-                <!-- Feature 2 -->
-                <div class="bg-gray-800 p-6 rounded-lg shadow-md text-center">
-                    <i class="fas fa-lock text-blue-400 text-4xl mb-4"></i>
-                    <h3 class="text-xl font-bold mb-2">100% Privacy Focused</h3>
-                    <p class="text-gray-400">
-                        Keep your data secure—everything stays on your device. Our platform never requires accounts, logins, or cloud storage.
-                    </p>
-                </div>
-                <!-- Feature 3 -->
-                <div class="bg-gray-800 p-6 rounded-lg shadow-md text-center">
-                    <i class="fas fa-cogs text-blue-400 text-4xl mb-4"></i>
-                    <h3 class="text-xl font-bold mb-2">Fully Customizable API Completion</h3>
-                    <p class="text-gray-400">
-                        Control advanced settings like model choice, temperature, and more. Easily save your configurations to optimize your AI experience.
-                    </p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- About Section -->
-    <section id="about" class="py-16 bg-gray-800">
-        <div class="container mx-auto px-6 text-center">
-            <h2 class="text-3xl font-bold text-white mb-6">Powered by Local AI Servers</h2>
-            <p class="text-lg text-gray-400 mb-6">
-                Our chat interface + API completion tool works with Ollama, Jan.ai, vLLM, and LM Studio. We've simplified all the steps to connect with your local server. Start chatting in seconds!
-            </p>
-            <button id="chatNowAbout" class="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white font-semibold text-lg rounded-lg transition">
-                Open Chat
-            </button>
-        </div>
-    </section>
-
-    <!-- Footer -->
-    <footer class="bg-gray-700 py-6">
-        <div class="container mx-auto px-6 flex justify-between items-center">
-            <p class="text-sm text-gray-400"> 2024 ailocalhost.com</p>
-            <div class="flex justify-between items-center">
-                <a href="https://itqix.com" class="text-sm text-gray-400 hover:text-gray-300">Developed by ITQIX Technology Group, LLC</a>
-                <a href="https://brand-positive.com" class="text-sm text-gray-400 hover:text-gray-300">Designed by Brand-Positive.com</a>
-            </div>
-        </div>
-    </footer>
-
-<!-- Entire content of index.html or changes to be made -->
-<!-- ... (rest of the file remains the same) -->
-
-<!-- Chat Now Modal -->
-<div id="chatNowModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center hidden">
-    <div class="bg-gray-800 p-8 rounded-lg shadow-lg text-center relative">
-        <h2 class="text-2xl font-bold mb-4">Work in progress!</h2>
-        <p class="text-gray-400 mb-6">Use our beta version currently available on <a href="https://iframeos.com" class="text-blue-500 hover:underline">https://iframeos.com</a>. Select the AI Chat app from the home-screen.</p>
-        <a href="https://iframeos.com" class="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg transition mb-4">Load Beta Site</a>
-        <button id="viewHereButton" class="px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg transition mb-4">Open Beta Here</button>
-        <button id="closeModal" class="absolute top-2 right-2 text-gray-400 hover:text-gray-200">
-            <i class="fas fa-times"></i>
-        </button>
-        <!-- Add a close button for the "Work in progress" view -->
-        <button id="closeWorkInProgress" class="absolute bottom-2 right-2 text-gray-400 hover:text-gray-200">
-            Close
-        </button>
-    </div>
-</div>
-
-<!-- ... (rest of the file remains the same) -->
-
-    <!-- Fullscreen Iframe Modal -->
-    <div id="iframeModal" class="fixed inset-0 hidden bg-gray-900 bg-opacity-75 flex items-center justify-center z-50">
-        <div class="relative w-full h-full">
-            <iframe src="https://iframeos.com" class="w-full h-full border-none"></iframe>
-            <button id="closeIframe" class="absolute top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-full">
-                Close
-            </button>
-        </div>
-    </div>
-
     <script>
-        const chatNowHeader = document.getElementById('chatNowHeader');
-        const chatNowMain = document.getElementById('chatNowMain');
-        const chatNowAbout = document.getElementById('chatNowAbout');
-        const chatNowModal = document.getElementById('chatNowModal');
-        const closeModal = document.getElementById('closeModal');
-        const viewHereButton = document.getElementById('viewHereButton');
-        const iframeModal = document.getElementById('iframeModal');
-        const closeIframe = document.getElementById('closeIframe');
-const closeWorkInProgress = document.getElementById('closeWorkInProgress');
-closeWorkInProgress?.addEventListener('click', () => {
-    chatNowModal.classList.add('hidden');
-});
-
-// ... (rest of the script remains the same)
-
-        // Add event listener to the documentation button
-        chatNowHeader?.addEventListener('click', () => {
-            chatNowModal.classList.remove('hidden');
-        });
-
-        chatNowMain?.addEventListener('click', () => {
-            chatNowModal.classList.remove('hidden');
-        });
-
-        chatNowAbout?.addEventListener('click', () => {
-            chatNowModal.classList.remove('hidden');
-        });
-
-        closeModal?.addEventListener('click', () => {
-            chatNowModal.classList.add('hidden');
-        });
-
-        viewHereButton?.addEventListener('click', () => {
-            iframeModal.classList.remove('hidden');
-            chatNowModal.classList.add('hidden');
-        });
-
-        closeIframe?.addEventListener('click', () => {
-            iframeModal.classList.add('hidden');
-            chatNowModal.classList.remove('hidden');
-        });
+        // Initialize dark mode on page load
+        if (localStorage.getItem('userSettings')) {
+            const settings = JSON.parse(localStorage.getItem('userSettings'));
+            if (settings.darkMode) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.add('light');
+            }
+        }
     </script>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
 </body>
 </html>
-
-
-
-
