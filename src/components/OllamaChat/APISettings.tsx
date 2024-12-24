@@ -3,7 +3,7 @@ import { APISettings, parameterDescriptions, serverStatusDescriptions } from '..
 import { Tooltip } from '../ui/Tooltip';
 import { FiInfo, FiX } from 'react-icons/fi';
 import { SavedConfigs } from './SavedConfigs';
-import { saveConfig, loadSavedConfigs } from '../../utils/configStorage';
+import { saveConfig } from '../../utils/configStorage';
 
 interface APISettingsPanelProps {
     settings: APISettings;
