@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { APISettings, parameterDescriptions, serverStatusDescriptions } from '../../types/api';
 import { Tooltip } from '../ui/Tooltip';
 import { FiInfo, FiX } from 'react-icons/fi';
 import { SavedConfigs } from './SavedConfigs';
-import { saveConfig } from '../../utils/configStorage';
+import { saveConfig, loadSavedConfigs } from '../../utils/configStorage';
 
 interface APISettingsPanelProps {
     settings: APISettings;
@@ -69,11 +69,14 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
         lan: 'unchecked',
         errors: []
     });
+    const [configs, setConfigs] = useState<APISettings[]>(loadSavedConfigs());
+    const [models, setModels] = useState<string[]>([]); // State to hold model names
 
     // Add new save handler
     const handleSaveConfig = () => {
-        saveConfig(settings);
-        // Could add a toast/notification here to confirm save
+        const newConfig = saveConfig(settings);
+        onSettingsChange(newConfig); // Update the settings with the new config
+        setConfigs(loadSavedConfigs()); // Refresh the saved configurations list
     };
 
     const checkServerStatus = async () => {
@@ -86,129 +89,85 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
         });
         onStatusUpdate('loading');
 
-        // Helper to update status with new error
-        const addError = (error: DetailedError) => {
+        // Construct the URL for the models endpoint
+        const modelsUrl = settings.serverUrl.replace(/\/v1.*/i, '/v1/models');
+
+        try {
+            const response = await fetch(modelsUrl, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${settings.apiKey}`
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`Error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log('Response Data:', data); // Log the response data for debugging
+
+            // Check if data has the expected structure
+            if (data.object === 'list' && Array.isArray(data.data)) {
+                const modelNames = data.data.map((model: { id: string }) => model.id); // Use 'id' for model names
+                setModels(modelNames); // Set the model names in state
+            } else {
+                throw new Error('Unexpected response format: ' + JSON.stringify(data));
+            }
+
             setStatus(prev => ({
                 ...prev,
-                errors: [...prev.errors, error]
+                http: 'success',
+                lan: 'success',
+                cors: 'success'
             }));
-        };
-
-        // 1. HTTP Check (Mixed Content)
-        try {
-            const serverUrl = new URL(settings.serverUrl);
-            const pageProtocol = window.location.protocol;
-
-            if (pageProtocol === 'https:' && serverUrl.protocol === 'http:') {
-                // Try a test request even with mixed content
-                try {
-                    const response = await fetch(settings.serverUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${settings.apiKey}` },
-                        body: JSON.stringify({
-                            model: settings.model,
-                            messages: [{ role: "user", content: "write back 'We're connected'" }],
-                            stream: true
-                        })
-                    });
-                    if (response.ok) {
-                        setStatus(prev => ({ ...prev, http: 'success' }));
-                        onStatusUpdate('success');
-                    } else {
-                        throw new Error('Server returned error status');
-                    }
-                } catch (error) {
-                    setStatus(prev => ({
-                        ...prev,
-                        http: 'error',
-                        lan: 'skipped',
-                        cors: 'skipped',
-                        errors: [{
-                            type: 'mixed_content',
-                            message: 'Mixed Content Error: Cannot access HTTP server from HTTPS page',
-                            details: 'Add the server URL to Chrome flags: chrome://flags/#unsafely-treat-insecure-origin-as-secure and restart Chrome'
-                        }]
-                    }));
-                    setIsChecking(false);
-                    onStatusUpdate('error');
-                    return;
-                }
-            } else {
-                setStatus(prev => ({ ...prev, http: 'success' }));
-                onStatusUpdate('success');
-            }
-
-            // 2. LAN Check
-            try {
-                const response = await fetch(settings.serverUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${settings.apiKey}` },
-                    body: JSON.stringify({
-                        model: settings.model,
-                        messages: [{ role: "user", content: "write back 'We're connected'" }],
-                        stream: false
-                    })
-                });
-
-                if (!response.ok) {
-                    throw new Error(`Error! status: ${response.status}`);
-                }
-
-                setStatus(prev => ({ ...prev, lan: 'success' }));
-                onStatusUpdate('success');
-
-                // 3. CORS Check
-                // If we got here, CORS is working
-                setStatus(prev => ({ ...prev, cors: 'success' }));
-                onStatusUpdate('success');
-
-            } catch (error) {
-                if (error instanceof Error) {
-                    if (error.message.includes('ERR_CONNECTION_REFUSED')) {
-                        setStatus(prev => ({
-                            ...prev,
-                            lan: 'error',
-                            cors: 'skipped',
-                            errors: [...prev.errors, {
-                                type: 'network',
-                                message: 'Server not accessible',
-                                details: 'Ensure OLLAMA_HOST is set to "0.0.0.0" for LAN access'
-                            }]
-                        }));
-                        onStatusUpdate('error');
-                    } else if (error.message.includes('CORS')) {
-                        setStatus(prev => ({
-                            ...prev,
-                            lan: 'success',
-                            cors: 'error',
-                            errors: [...prev.errors, {
-                                type: 'cors',
-                                message: 'CORS not enabled on server',
-                                details: 'Set OLLAMA_ORIGINS to allow this website'
-                            }]
-                        }));
-                        onStatusUpdate('error');
-                    } else {
-                        addError({
-                            type: 'unknown',
-                            message: error.message,
-                            details: 'Unknown error occurred during server check'
-                        });
-                        onStatusUpdate('error');
-                    }
-                }
-            }
+            onStatusUpdate('success');
         } catch (error) {
-            addError({
-                type: 'unknown',
-                message: 'Invalid server URL',
-                details: error instanceof Error ? error.message : 'Unknown error'
-            });
+            console.error('Server Check Error:', error);
+            let errorType: 'mixed_content' | 'network' | 'cors' | 'unknown' = 'unknown';
+            let errorMessage = 'An unknown error occurred.';
+
+            if (error instanceof Error) {
+                const errorMsg = error.message.toLowerCase();
+                if (errorMsg.includes('mixed content')) {
+                    errorType = 'mixed_content';
+                    errorMessage = 'Mixed Content Error: Cannot access HTTP server from HTTPS page.';
+                    setStatus(prev => ({ ...prev, http: 'error' }));
+                } else if (
+                    errorMsg.includes('address unreachable') || 
+                    errorMsg.includes('no response') || 
+                    errorMsg.includes('timeout') || 
+                    errorMsg.includes('connection timed out') ||
+                    errorMsg.includes('connection refused')
+                ) {
+                    errorType = 'network';
+                    errorMessage = 'Network Error: The server address is unreachable.';
+                    setStatus(prev => ({ ...prev, lan: 'error' }));
+                } else if (errorMsg.includes('cors')) {
+                    errorType = 'cors';
+                    errorMessage = 'CORS Error: The server is not allowing requests from this origin.';
+                    setStatus(prev => ({ ...prev, cors: 'error' }));
+                }
+            }
+
+            setStatus(prev => ({
+                ...prev,
+                errors: [{
+                    type: errorType,
+                    message: errorMessage,
+                    details: error instanceof Error ? error.message : 'Unknown error'
+                }]
+            }));
             onStatusUpdate('error');
         } finally {
             setIsChecking(false);
         }
     };
+
+    // Automatically run server check when the component mounts or when settings change
+    useEffect(() => {
+        checkServerStatus();
+    }, [settings]); // Run when settings change
 
     return (
         <div className={`absolute right-0 top-0 bottom-0 w-full md:w-96 bg-gray-900 dark:bg-gray-900 
@@ -227,6 +186,7 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
 
             <div className="flex-1 overflow-y-auto">
                 <div className="p-4 space-y-6">
+
                     {/* Server Status Section */}
                     <div className="space-y-2">
                         <div className="flex justify-between items-center">
@@ -242,7 +202,7 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                                 {isChecking ? 'Checking...' : 'Check Connection'}
                             </button>
                         </div>
-                        <div className="space-y-1">
+                        <div className="flex space-x-2">
                             <StatusRow label="http" status={status.http} />
                             <StatusRow label="lan" status={status.lan} />
                             <StatusRow label="cors" status={status.cors} />
@@ -301,8 +261,8 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                         </p>
                     </div>
 
-                    {/* API Key */}
-                    <div>
+                                        {/* API Key */}
+                                        <div>
                         <label className="block text-sm font-medium mb-1 flex items-center text-gray-200">
                             <span>API Key</span>
                             <InfoIcon content={parameterDescriptions.apiKey} />
@@ -318,22 +278,26 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                         />
                     </div>
 
-                    {/* Model */}
+
+                    {/* Model Selection Dropdown */}
                     <div>
-                        <label className="block text-sm font-medium mb-1 flex items-center text-gray-200">
-                            <span>Model</span>
-                            <InfoIcon content={parameterDescriptions.model} />
+                        <label className="block text-sm font-medium mb-1 text-gray-200">
+                            Model
                         </label>
-                        <input
-                            type="text"
+                        <select
                             value={settings.model}
                             onChange={(e) => onSettingsChange({
                                 ...settings,
                                 model: e.target.value
                             })}
                             className="w-full p-2 border rounded bg-gray-800 dark:bg-gray-800 text-gray-200 border-gray-700"
-                        />
+                        >
+                            {models.map((modelName, index) => (
+                                <option key={index} value={modelName}>{modelName}</option>
+                            ))}
+                        </select>
                     </div>
+
 
                     {/* Temperature */}
                     <div>
@@ -463,25 +427,25 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
     );
 };
 
-// Update the StatusRow component to use the InfoIcon component
+// Update the StatusRow component to center the info icon
 const StatusRow: React.FC<{ label: keyof typeof STATUS_INFO; status: string }> = ({ label, status }) => (
-    <div className="flex items-center justify-between text-gray-200">
+    <div className="flex items-center space-x-2 bg-gray-800 p-2 rounded-full text-gray-200">
+        <span className="text-xs">{STATUS_INFO[label].label}</span>
         <div className="flex items-center">
-            <span className="text-sm">{STATUS_INFO[label].label}</span>
             <InfoIcon content={STATUS_INFO[label].description} />
         </div>
         <StatusIndicator status={status} />
     </div>
 );
 
-// Update StatusIndicator to handle new states
+// Update StatusIndicator to match the colors used on top of the chat
 const StatusIndicator: React.FC<{ status: string }> = ({ status }) => {
     const getStatusColor = () => {
         switch (status) {
             case 'success':
-                return 'bg-green-700';
+                return 'bg-green-500'; // Match with chat status color
             case 'error':
-                return 'bg-red-700';
+                return 'bg-red-500';   // Match with chat status color
             case 'loading':
                 return 'bg-yellow-700';
             case 'skipped':

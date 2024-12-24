@@ -36,7 +36,9 @@ export const serverStatusDescriptions = {
     **How to fix:**
     1. For Ollama servers, set \`OLLAMA_HOST="0.0.0.0"\`
     2. On macOS, run: \`launchctl setenv OLLAMA_HOST "0.0.0.0"\`
-    3. Restart Ollama`,
+    3. Ensure you allow the browser to access the local network: 
+       Go to Settings > Privacy & Security > Local Network and enable access for your browser.
+    4. Restart Ollama`,
     
     cors: `**SERVER ISSUE**
     CORS (Cross-Origin Resource Sharing) blocks access. The server needs to allow this website.
