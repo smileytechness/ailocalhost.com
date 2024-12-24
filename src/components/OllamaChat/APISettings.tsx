@@ -70,13 +70,11 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
         errors: []
     });
     const [models, setModels] = useState<string[]>([]); // State to hold model names
-    const [configs, setConfigs] = useState<APISettings[]>(loadSavedConfigs());
 
     // Add new save handler
     const handleSaveConfig = () => {
         const newConfig = saveConfig(settings);
         onSettingsChange(newConfig); // Update the settings with the new config
-        setConfigs(loadSavedConfigs()); // Refresh the saved configurations list
     };
 
     const checkServerStatus = async () => {
