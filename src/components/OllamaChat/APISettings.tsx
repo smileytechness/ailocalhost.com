@@ -69,8 +69,8 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
         lan: 'unchecked',
         errors: []
     });
-    const [configs, setConfigs] = useState<APISettings[]>(loadSavedConfigs());
     const [models, setModels] = useState<string[]>([]); // State to hold model names
+    const [configs, setConfigs] = useState<APISettings[]>(loadSavedConfigs());
 
     // Add new save handler
     const handleSaveConfig = () => {

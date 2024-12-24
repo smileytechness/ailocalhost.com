@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { APISettings } from '../../types/api';
-import { loadSavedConfigs, deleteConfig, updateConfigName } from '../../utils/configStorage';
-import { FiTrash2, FiEdit } from 'react-icons/fi';
+import { loadSavedConfigs, deleteConfig } from '../../utils/configStorage';
+import { FiTrash2 } from 'react-icons/fi';
 
 interface SavedConfigsProps {
     onLoadConfig: (config: APISettings) => void;
@@ -9,21 +9,10 @@ interface SavedConfigsProps {
 
 export const SavedConfigs: React.FC<SavedConfigsProps> = ({ onLoadConfig }) => {
     const [configs, setConfigs] = useState<APISettings[]>(loadSavedConfigs());
-    const [editingId, setEditingId] = useState<string | null>(null);
-    const [editingName, setEditingName] = useState('');
 
     const handleDelete = (id: string) => {
         deleteConfig(id);
         setConfigs(loadSavedConfigs());
-    };
-
-    const handleRename = (id: string) => {
-        if (editingName.trim()) {
-            updateConfigName(id, editingName);
-            setConfigs(loadSavedConfigs());
-            setEditingId(null);
-            setEditingName('');
-        }
     };
 
     return (
