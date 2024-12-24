@@ -27,8 +27,8 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose, onMinimize }) => {
             serverUrl: 'http://localhost:11434/v1/chat/completions',
             model: 'qwen2.5',
             temperature: 1.0,
-            maxTokens: 150,
-            topP: 0.9,
+            maxTokens: 500,
+            topP: 1.0,
             frequencyPenalty: 0,
             presencePenalty: 0
         };
@@ -40,26 +40,45 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose, onMinimize }) => {
     const [isSettingsExpanded, setIsSettingsExpanded] = useState(false);
     const [serverStatus, setServerStatus] = useState<'success' | 'error' | 'loading' | 'unchecked'>('unchecked');
     const [autoScroll, setAutoScroll] = useState(true);
+    const [wasScrollAtBottom, setWasScrollAtBottom] = useState(true);
 
     useEffect(() => {
-        if (autoScroll && messagesContainerRef.current) {
+        const scrollContainer = messagesContainerRef.current;
+        if (scrollContainer) {
+            const handleScroll = () => {
+                const atBottom = scrollContainer.scrollTop + scrollContainer.offsetHeight === scrollContainer.scrollHeight;
+                if (!atBottom && wasScrollAtBottom) {
+                    setWasScrollAtBottom(false);
+                }
+                if (atBottom) {
+                    setWasScrollAtBottom(true);
+                }
+            };
+            scrollContainer.addEventListener('scroll', handleScroll);
+            return () => scrollContainer.removeEventListener('scroll', handleScroll);
+        }
+    }, [messagesContainerRef, wasScrollAtBottom]);
+
+    useEffect(() => {
+        if (autoScroll && wasScrollAtBottom && messagesContainerRef.current) {
             messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
         }
-    }, [messages, autoScroll]);
+    }, [messages, autoScroll, wasScrollAtBottom]);
 
     useEffect(() => {
         if (messages.length > 0 && messages[messages.length - 1].isUser) {
             setAutoScroll(true);
+            setWasScrollAtBottom(true);
         }
     }, [messages]);
 
     const handleSendMessage = async () => {
+        setAutoScroll(true); 
         if (!input.trim()) return;
 
         setMessages(prev => [...prev, { content: input, isUser: true }]);
         const userMessage = input;
         setInput('');
-
         try {
             const response = await fetch(apiSettings.serverUrl, {
                 method: 'POST',
@@ -87,7 +106,6 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose, onMinimize }) => {
             if (!reader) throw new Error('No reader available');
 
             let currentMessage = '';
-
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
@@ -111,8 +129,8 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose, onMinimize }) => {
                                 } else {
                                     newMessages[newMessages.length - 1] = {
                                         content: currentMessage,
-                                        isUser: false
-                                    };
+                isUser: false
+    };
                                 }
 
                                 return newMessages;
@@ -130,11 +148,10 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose, onMinimize }) => {
                 isUser: false
             }]);
         }
-    };
+};
 
     return (
         <div className="fixed inset-0 bg-gray-900 flex flex-col">
-            {/* Header */}
             <div className="flex-none border-b border-gray-700">
                 <div className="flex items-center justify-between p-4">
                     <div className="flex items-center space-x-4">
@@ -168,11 +185,8 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose, onMinimize }) => {
                 </div>
             </div>
 
-            {/* Main Content Area */}
             <div className="flex-1 flex relative overflow-hidden">
-                {/* Chat Container */}
                 <div className="flex-1 flex flex-col overflow-hidden">
-                    {/* Messages Area */}
                     <div
                         ref={messagesContainerRef}
                         className="flex-1 overflow-y-auto p-4"
@@ -184,7 +198,6 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose, onMinimize }) => {
                         </div>
                     </div>
 
-                    {/* Input Area */}
                     <div className="flex-none border-t border-gray-700">
                         <div className="max-w-3xl mx-auto p-4">
                             <div className="flex items-center space-x-2">
@@ -209,7 +222,6 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose, onMinimize }) => {
                     </div>
                 </div>
 
-                {/* Settings Panel */}
                 <div className={`absolute inset-y-0 right-0 w-full md:w-[400px] bg-gray-800 
                                shadow-xl transition-transform duration-300 transform
                                ${isSettingsExpanded ? 'translate-x-0' : 'translate-x-full'}
