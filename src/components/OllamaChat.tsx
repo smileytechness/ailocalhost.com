@@ -2,13 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import APISettingsPanel from './OllamaChat/APISettings';
 import { APISettings } from '../types/api';
 import { loadSavedConfigs, getLastUsedConfig, setLastUsedConfig } from '../utils/configStorage';
-import { FiChevronDown, FiMinus, FiX } from 'react-icons/fi';
+import { FiChevronDown, FiX } from 'react-icons/fi';
 import MessageBubble from './OllamaChat/MessageBubble';
 import StatusIndicator from './OllamaChat/StatusIndicator';
 
 interface OllamaChatProps {
     onClose: () => void;
-    onMinimize: () => void;
 }
 
 const getDisplayUrl = (url: string): string => {
@@ -20,7 +19,7 @@ const getDisplayUrl = (url: string): string => {
     }
 };
 
-const OllamaChat: React.FC<OllamaChatProps> = ({ onClose, onMinimize }) => {
+const OllamaChat: React.FC<OllamaChatProps> = ({ onClose }) => {
     const [apiSettings, setApiSettings] = useState<APISettings>(() => {
         const lastUsed = getLastUsedConfig();
         return lastUsed || {

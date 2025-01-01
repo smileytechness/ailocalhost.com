@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { APISettings, parameterDescriptions, serverStatusDescriptions } from '../../types/api';
 import { Tooltip } from '../ui/Tooltip';
 import { FiInfo, FiX } from 'react-icons/fi';
@@ -8,7 +8,6 @@ import { saveConfig, setLastUsedConfig } from '../../utils/configStorage';
 interface APISettingsPanelProps {
     settings: APISettings;
     onSettingsChange: (settings: APISettings) => void;
-    isExpanded: boolean;
     onExpandedChange: (expanded: boolean) => void;
     onStatusUpdate: (status: 'success' | 'error' | 'loading' | 'unchecked') => void;
     runImmediateCheck?: boolean;
@@ -59,7 +58,6 @@ const InfoIcon: React.FC<{ content: string }> = ({ content }) => (
 const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
     settings,
     onSettingsChange,
-    isExpanded,
     onExpandedChange,
     onStatusUpdate,
     runImmediateCheck
