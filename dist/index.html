@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+    <meta charset="UTF-8" />
+    <link rel="icon" href="/ailhlogo.png" type="image/png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="AI Chat: Chat with Your Local AI Using ailocalhost.com..." />
+    <title>ailocalhost.com - AI Chat GUI for Ollama and OpenAI-API servers. Private AI, Simplified</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-6HREZ9FCWV"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', 'G-6HREZ9FCWV');
+    </script>
+    <script>
+        // Initialize dark mode on page load
+        if (localStorage.getItem('userSettings')) {
+            const settings = JSON.parse(localStorage.getItem('userSettings'));
+            if (settings.darkMode) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.add('light');
+            }
+        }
+    </script>
+  <script type="module" crossorigin src="/assets/index-DGGxKlnW.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/vendor-iN9lqvNv.js">
+  <link rel="stylesheet" crossorigin href="/assets/index-DNsBhN1g.css">
+</head>
+<body>
+    <div id="root"></div>
+</body>
+</html>
