@@ -100,7 +100,6 @@ export const HomeScreen: React.FC = () => {
                         {showConsole && <Console onClose={handleCloseIframe} />}
                         {showOllamaChat && <OllamaChat 
                             onClose={handleCloseIframe} 
-                            onMinimize={() => setShowOllamaChat(false)}
                         />}
                     </div>
                 </div>

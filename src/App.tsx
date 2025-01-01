@@ -12,7 +12,6 @@ const App: React.FC = () => {
                 {showChat ? (
                     <OllamaChat
                         onClose={() => setShowChat(false)}
-                        onMinimize={() => setShowChat(false)}
                     />
                 ) : (
                     <LandingPage onStartChat={() => setShowChat(true)} />

@@ -329,7 +329,6 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose }) => {
                     <APISettingsPanel
                         settings={apiSettings}
                         onSettingsChange={handleApiSettingsChange}
-                        isExpanded={true}
                         onExpandedChange={() => {}}
                         onStatusUpdate={setServerStatus}
                         runImmediateCheck={runImmediateCheck}
@@ -346,7 +345,6 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose }) => {
                             <APISettingsPanel
                                 settings={apiSettings}
                                 onSettingsChange={handleApiSettingsChange}
-                                isExpanded={isSettingsExpanded}
                                 onExpandedChange={setIsSettingsExpanded}
                                 onStatusUpdate={setServerStatus}
                                 runImmediateCheck={runImmediateCheck}
