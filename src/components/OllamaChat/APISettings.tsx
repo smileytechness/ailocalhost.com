@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { APISettings, parameterDescriptions, serverStatusDescriptions } from '../../types/api';
 import { Tooltip } from '../ui/Tooltip';
 import { FiInfo, FiX } from 'react-icons/fi';
 import { SavedConfigs } from './SavedConfigs';
-import { saveConfig } from '../../utils/configStorage';
+import { saveConfig, setLastUsedConfig } from '../../utils/configStorage';
 
 interface APISettingsPanelProps {
     settings: APISettings;
@@ -11,10 +11,11 @@ interface APISettingsPanelProps {
     isExpanded: boolean;
     onExpandedChange: (expanded: boolean) => void;
     onStatusUpdate: (status: 'success' | 'error' | 'loading' | 'unchecked') => void;
+    runImmediateCheck?: boolean;
 }
 
-// Add new type for detailed error tracking
-type ErrorType = 'mixed_content' | 'network' | 'cors' | 'unknown';
+// Add new type for auth error
+type ErrorType = 'mixed_content' | 'network' | 'cors' | 'auth' | 'unknown';
 
 interface DetailedError {
     type: ErrorType;
@@ -60,7 +61,8 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
     onSettingsChange,
     isExpanded,
     onExpandedChange,
-    onStatusUpdate
+    onStatusUpdate,
+    runImmediateCheck
 }) => {
     const [isChecking, setIsChecking] = useState(false);
     const [status, setStatus] = useState<LocalServerStatus>({
@@ -69,15 +71,88 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
         lan: 'unchecked',
         errors: []
     });
-    const [models, setModels] = useState<string[]>([]); // State to hold model names
+    const [models, setModels] = useState<string[]>([]);
+    const checkTimeoutRef = useRef<number | null>(null);
+    const previousUrlRef = useRef<string>(settings.serverUrl);
+    const previousKeyRef = useRef<string>(settings.apiKey);
+    const previousModelRef = useRef<string>(settings.model);
+    const [countdown, setCountdown] = useState<number | null>(null);
+    const countdownIntervalRef = useRef<number | null>(null);
 
-    // Add new save handler
-    const handleSaveConfig = () => {
-        const newConfig = saveConfig(settings);
-        onSettingsChange(newConfig); // Update the settings with the new config
+    // Cleanup function for intervals and timeouts
+    const cleanupTimers = () => {
+        if (checkTimeoutRef.current) {
+            clearTimeout(checkTimeoutRef.current);
+        }
+        if (countdownIntervalRef.current) {
+            clearInterval(countdownIntervalRef.current);
+        }
     };
 
+    // Cleanup on unmount
+    useEffect(() => {
+        return cleanupTimers;
+    }, []);
+
+    // Initial load check
+    useEffect(() => {
+        if (settings.serverUrl) {
+            checkServerStatus();
+        }
+    }, []);
+
+    // Watch for relevant settings changes
+    useEffect(() => {
+        const hasSettingsChanged = 
+            settings.serverUrl !== previousUrlRef.current || 
+            settings.apiKey !== previousKeyRef.current ||
+            settings.model !== previousModelRef.current;
+
+        if (hasSettingsChanged) {
+            // Update refs
+            previousUrlRef.current = settings.serverUrl;
+            previousKeyRef.current = settings.apiKey;
+            previousModelRef.current = settings.model;
+
+            // Reset status to unchecked
+            setStatus(prev => ({
+                ...prev,
+                http: 'unchecked',
+                lan: 'unchecked',
+                cors: 'unchecked'
+            }));
+            onStatusUpdate('unchecked');
+
+            // Clear existing timers
+            cleanupTimers();
+
+            if (runImmediateCheck) {
+                // Run check immediately if requested
+                checkServerStatus();
+            } else {
+                // Start countdown for normal typing updates
+                setCountdown(3.0);
+                countdownIntervalRef.current = window.setInterval(() => {
+                    setCountdown(prev => {
+                        if (prev === null || prev <= 0) {
+                            clearInterval(countdownIntervalRef.current!);
+                            return null;
+                        }
+                        return Math.max(0, prev - 0.1);
+                    });
+                }, 100);
+
+                // Set new check timeout
+                checkTimeoutRef.current = window.setTimeout(() => {
+                    checkServerStatus();
+                }, 3000);
+            }
+        }
+    }, [settings.serverUrl, settings.apiKey, settings.model, runImmediateCheck]);
+
     const checkServerStatus = async () => {
+        if (!settings.serverUrl) return;
+
         setIsChecking(true);
         setStatus({
             http: 'loading',
@@ -87,7 +162,6 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
         });
         onStatusUpdate('loading');
 
-        // Construct the URL for the models endpoint
         const modelsUrl = settings.serverUrl.replace(/\/v1.*/i, '/v1/models');
 
         try {
@@ -99,16 +173,18 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
             });
 
             if (!response.ok) {
-                throw new Error(`Error! status: ${response.status}`);
+                // Handle HTTP error responses
+                if (response.status === 401 || response.status === 403) {
+                    throw new Error(`Authentication failed: ${response.status}`);
+                }
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
 
             const data = await response.json();
-            console.log('Response Data:', data); // Log the response data for debugging
-
-            // Check if data has the expected structure
+            
             if (data.object === 'list' && Array.isArray(data.data)) {
-                const modelNames = data.data.map((model: { id: string }) => model.id); // Use 'id' for model names
-                setModels(modelNames); // Set the model names in state
+                const modelNames = data.data.map((model: { id: string }) => model.id);
+                setModels(modelNames);
             } else {
                 throw new Error('Unexpected response format: ' + JSON.stringify(data));
             }
@@ -117,109 +193,177 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                 ...prev,
                 http: 'success',
                 lan: 'success',
-                cors: 'success'
+                cors: 'success',
+                errors: []
             }));
             onStatusUpdate('success');
         } catch (error) {
             console.error('Server Check Error:', error);
-            let errorType: 'mixed_content' | 'network' | 'cors' | 'unknown' = 'unknown';
+            let errorType: ErrorType = 'unknown';
             let errorMessage = 'An unknown error occurred.';
+            let newStatus = { ...status };
 
             if (error instanceof Error) {
                 const errorMsg = error.message.toLowerCase();
+                
+                // Check for mixed content error (HTTP/S)
                 if (errorMsg.includes('mixed content')) {
                     errorType = 'mixed_content';
                     errorMessage = 'Mixed Content Error: Cannot access HTTP server from HTTPS page.';
-                    setStatus(prev => ({ ...prev, http: 'error' }));
-                } else if (
-                    errorMsg.includes('address unreachable') || 
-                    errorMsg.includes('no response') || 
-                    errorMsg.includes('timeout') || 
-                    errorMsg.includes('connection timed out') ||
-                    errorMsg.includes('connection refused')
+                    newStatus.http = 'error';
+                }
+                // Check for network errors (LAN)
+                else if (
+                    errorMsg.includes('net::err_connection_timed_out') ||
+                    errorMsg.includes('net::err_connection_refused') ||
+                    errorMsg.includes('net::err_address_unreachable') ||
+                    errorMsg.includes('failed to fetch') ||
+                    errorMsg.includes('network error')
                 ) {
                     errorType = 'network';
                     errorMessage = 'Network Error: The server address is unreachable.';
-                    setStatus(prev => ({ ...prev, lan: 'error' }));
-                } else if (errorMsg.includes('cors')) {
+                    newStatus.lan = 'error';
+                }
+                // Check for CORS errors
+                else if (errorMsg.includes('cors')) {
                     errorType = 'cors';
                     errorMessage = 'CORS Error: The server is not allowing requests from this origin.';
-                    setStatus(prev => ({ ...prev, cors: 'error' }));
+                    newStatus.cors = 'error';
+                }
+                // Check for authentication errors
+                else if (
+                    errorMsg.includes('authentication failed') ||
+                    errorMsg.includes('401') ||
+                    errorMsg.includes('403')
+                ) {
+                    errorType = 'auth';
+                    errorMessage = 'Authentication Error: Invalid or missing API key.';
+                    newStatus.http = 'error';
                 }
             }
 
-            setStatus(prev => ({
-                ...prev,
+            setStatus({
+                ...newStatus,
                 errors: [{
                     type: errorType,
                     message: errorMessage,
                     details: error instanceof Error ? error.message : 'Unknown error'
                 }]
-            }));
+            });
             onStatusUpdate('error');
         } finally {
             setIsChecking(false);
         }
     };
 
-    // Automatically run server check when the component mounts or when settings change
-    useEffect(() => {
-        checkServerStatus();
-    }, [settings]); // Run when settings change
+    const handleSettingsChange = (newSettings: Partial<APISettings>) => {
+        const updatedSettings = {
+            ...settings,
+            ...newSettings
+        };
+        onSettingsChange(updatedSettings);
+        setLastUsedConfig(updatedSettings);
+    };
+
+    // Add save handler
+    const handleSaveConfig = () => {
+        const newConfig = saveConfig({
+            ...settings,
+            model: settings.model || '',  // Ensure model is saved
+            temperature: settings.temperature || 0.7,
+            maxTokens: settings.maxTokens || 2000,
+            topP: settings.topP || 1,
+            frequencyPenalty: settings.frequencyPenalty || 0,
+            presencePenalty: settings.presencePenalty || 0
+        });
+        // Update the settings with the new config
+        onSettingsChange(newConfig);
+    };
 
     return (
-        <div className={`absolute right-0 top-0 bottom-0 w-full md:w-96 bg-gray-900 dark:bg-gray-900 
-                        shadow-xl transition-transform duration-300 ease-in-out transform
-                        ${isExpanded ? 'translate-x-0' : 'translate-x-full'}
-                        flex flex-col border-l border-gray-700 dark:border-gray-700`}>
-            <div className="flex items-center justify-between p-4 border-b border-gray-700 dark:border-gray-700">
-                <h2 className="text-lg font-semibold text-gray-200">API Settings</h2>
-                <button
-                    onClick={() => onExpandedChange(false)}
-                    className="p-2 hover:bg-gray-800 dark:hover:bg-gray-800 rounded-full text-gray-200"
-                >
-                    <FiX className="w-5 h-5" />
-                </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto">
-                <div className="p-4 space-y-6">
-
-                    {/* Server Status Section */}
-                    <div className="space-y-2">
-                        <div className="flex justify-between items-center">
-                            <h3 className="text-sm font-medium text-gray-200">Server Status</h3>
-                            <button
-                                onClick={checkServerStatus}
-                                disabled={isChecking}
-                                className={`px-3 py-1 text-sm rounded-md ${isChecking
-                                    ? 'bg-gray-700 cursor-not-allowed'
-                                    : 'bg-blue-700 hover:bg-blue-800'
-                                    } text-gray-200 transition-colors`}
-                            >
-                                {isChecking ? 'Checking...' : 'Check Connection'}
-                            </button>
-                        </div>
-                        <div className="flex space-x-2">
-                            <StatusRow label="http" status={status.http} />
-                            <StatusRow label="lan" status={status.lan} />
-                            <StatusRow label="cors" status={status.cors} />
-                        </div>
-                        {status.errors.length > 0 && (
-                            <div className="mt-2 p-3 bg-red-900/20 dark:bg-red-900/20 rounded-md">
-                                <h4 className="text-sm font-medium text-red-200 dark:text-red-200">Errors:</h4>
-                                <ul className="mt-1 text-sm text-red-300 dark:text-red-300">
-                                    {status.errors.map((error, index) => (
-                                        <li key={index}>
-                                            <strong>{error.message}</strong>
-                                            {error.details && <p className="text-xs mt-1">{error.details}</p>}
-                                        </li>
-                                    ))}
-                                </ul>
+        <div className="h-full flex flex-col bg-gray-900">
+            {/* Always show title on desktop */}
+            <div className="hidden md:flex flex-col p-4 border-b border-gray-700">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h2 className="text-lg font-semibold text-gray-200">API Settings</h2>
+                        {countdown !== null && (
+                            <div className="text-[10px] text-gray-400 -mt-1">
+                                Checking in {countdown.toFixed(1)}s
                             </div>
                         )}
                     </div>
+                    <button
+                        onClick={checkServerStatus}
+                        disabled={isChecking}
+                        className={`px-4 py-1.5 text-sm rounded-md ${
+                            isChecking
+                                ? 'bg-gray-700 cursor-not-allowed'
+                                : 'bg-blue-700 hover:bg-blue-800'
+                        } text-gray-200 transition-colors`}
+                    >
+                        {isChecking ? 'Checking...' : 'Check Connection'}
+                    </button>
+                </div>
+            </div>
 
+            {/* Only show close button on mobile */}
+            <div className="md:hidden flex items-center justify-between p-4 border-b border-gray-700">
+                <div>
+                    <h2 className="text-lg font-semibold text-gray-200">API Settings</h2>
+                    {countdown !== null && (
+                        <div className="text-[10px] text-gray-400 -mt-1">
+                            Checking in {countdown.toFixed(1)}s
+                        </div>
+                    )}
+                </div>
+                <div className="flex items-center space-x-4">
+                    <button
+                        onClick={checkServerStatus}
+                        disabled={isChecking}
+                        className={`px-4 py-1.5 text-sm rounded-md ${
+                            isChecking
+                                ? 'bg-gray-700 cursor-not-allowed'
+                                : 'bg-blue-700 hover:bg-blue-800'
+                        } text-gray-200 transition-colors`}
+                    >
+                        {isChecking ? 'Checking...' : 'Check Connection'}
+                    </button>
+                    <button
+                        onClick={() => onExpandedChange(false)}
+                        className="p-2 hover:bg-gray-800 rounded-full text-gray-200"
+                    >
+                        <FiX className="w-5 h-5" />
+                    </button>
+                </div>
+            </div>
+
+            {/* Fixed status section */}
+            <div className="flex-none p-4 border-b border-gray-700">
+                <div className="flex space-x-2">
+                    <StatusRow label="http" status={status.http} />
+                    <StatusRow label="lan" status={status.lan} />
+                    <StatusRow label="cors" status={status.cors} />
+                </div>
+
+                {status.errors.length > 0 && (
+                    <div className="mt-2 p-3 bg-red-900/20 rounded-md">
+                        <h4 className="text-sm font-medium text-red-200">Errors:</h4>
+                        <ul className="mt-1 text-sm text-red-300">
+                            {status.errors.map((error, index) => (
+                                <li key={index}>
+                                    <strong>{error.message}</strong>
+                                    {error.details && <p className="text-xs mt-1">{error.details}</p>}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
+            </div>
+
+            {/* Scrollable content */}
+            <div className="flex-1 overflow-y-auto">
+                <div className="p-4 space-y-6">
                     {/* Server URL */}
                     <div>
                         <label className="block text-sm font-medium mb-1 text-gray-200">
@@ -233,34 +377,31 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                                 try {
                                     if (e.target.value && !e.target.value.startsWith('http')) {
                                         // Automatically add http:// if missing
-                                        onSettingsChange({
-                                            ...settings,
+                                        handleSettingsChange({
                                             serverUrl: `http://${e.target.value}`
                                         });
                                     } else {
-                                        onSettingsChange({
-                                            ...settings,
+                                        handleSettingsChange({
                                             serverUrl: e.target.value
                                         });
                                     }
                                 } catch (e) {
                                     // If there's an error, just update the raw text
-                                    onSettingsChange({
-                                        ...settings,
+                                    handleSettingsChange({
                                         serverUrl: (e as React.ChangeEvent<HTMLInputElement>).target.value
                                     });
                                 }
                             }}
                             placeholder="http://localhost:11434/v1/chat/completions"
-                            className="w-full p-2 border rounded bg-gray-800 dark:bg-gray-800 text-gray-200 border-gray-700"
+                            className="w-full p-2 border rounded bg-gray-800 text-gray-200 border-gray-700"
                         />
                         <p className="mt-1 text-xs text-gray-400">
                             Example: http://localhost:11434/v1/chat/completions
                         </p>
                     </div>
 
-                                        {/* API Key */}
-                                        <div>
+                    {/* API Key */}
+                    <div>
                         <label className="block text-sm font-medium mb-1 flex items-center text-gray-200">
                             <span>API Key</span>
                             <InfoIcon content={parameterDescriptions.apiKey} />
@@ -268,34 +409,30 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                         <input
                             type="text"
                             value={settings.apiKey}
-                            onChange={(e) => onSettingsChange({
-                                ...settings,
+                            onChange={(e) => handleSettingsChange({
                                 apiKey: e.target.value
                             })}
-                            className="w-full p-2 border rounded bg-gray-800 dark:bg-gray-800 text-gray-200 border-gray-700"
+                            className="w-full p-2 border rounded bg-gray-800 text-gray-200 border-gray-700"
                         />
                     </div>
 
-
-                    {/* Model Selection Dropdown */}
+                    {/* Model Selection */}
                     <div>
                         <label className="block text-sm font-medium mb-1 text-gray-200">
                             Model
                         </label>
                         <select
                             value={settings.model}
-                            onChange={(e) => onSettingsChange({
-                                ...settings,
+                            onChange={(e) => handleSettingsChange({
                                 model: e.target.value
                             })}
-                            className="w-full p-2 border rounded bg-gray-800 dark:bg-gray-800 text-gray-200 border-gray-700"
+                            className="w-full p-2 border rounded bg-gray-800 text-gray-200 border-gray-700"
                         >
                             {models.map((modelName, index) => (
                                 <option key={index} value={modelName}>{modelName}</option>
                             ))}
                         </select>
                     </div>
-
 
                     {/* Temperature */}
                     <div>
@@ -309,8 +446,7 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                             max="2"
                             step="0.1"
                             value={settings.temperature}
-                            onChange={(e) => onSettingsChange({
-                                ...settings,
+                            onChange={(e) => handleSettingsChange({
                                 temperature: parseFloat(e.target.value)
                             })}
                             className="w-full accent-blue-600"
@@ -329,11 +465,10 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                         <input
                             type="number"
                             value={settings.maxTokens}
-                            onChange={(e) => onSettingsChange({
-                                ...settings,
+                            onChange={(e) => handleSettingsChange({
                                 maxTokens: parseInt(e.target.value)
                             })}
-                            className="w-full p-2 border rounded bg-gray-800 dark:bg-gray-800 text-gray-200 border-gray-700"
+                            className="w-full p-2 border rounded bg-gray-800 text-gray-200 border-gray-700"
                         />
                     </div>
 
@@ -349,8 +484,7 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                             max="1"
                             step="0.1"
                             value={settings.topP}
-                            onChange={(e) => onSettingsChange({
-                                ...settings,
+                            onChange={(e) => handleSettingsChange({
                                 topP: parseFloat(e.target.value)
                             })}
                             className="w-full accent-blue-600"
@@ -372,8 +506,7 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                             max="2"
                             step="0.1"
                             value={settings.frequencyPenalty}
-                            onChange={(e) => onSettingsChange({
-                                ...settings,
+                            onChange={(e) => handleSettingsChange({
                                 frequencyPenalty: parseFloat(e.target.value)
                             })}
                             className="w-full accent-blue-600"
@@ -395,8 +528,7 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                             max="2"
                             step="0.1"
                             value={settings.presencePenalty}
-                            onChange={(e) => onSettingsChange({
-                                ...settings,
+                            onChange={(e) => handleSettingsChange({
                                 presencePenalty: parseFloat(e.target.value)
                             })}
                             className="w-full accent-blue-600"
@@ -406,7 +538,7 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                         </div>
                     </div>
 
-                    {/* Add save configuration button */}
+                    {/* Save configuration button */}
                     <div className="mt-4 border-t border-gray-700 pt-4">
                         <button
                             onClick={handleSaveConfig}
@@ -417,7 +549,7 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                         </button>
                     </div>
 
-                    {/* Add SavedConfigs component */}
+                    {/* SavedConfigs component */}
                     <SavedConfigs onLoadConfig={onSettingsChange} />
                 </div>
             </div>

@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import APISettingsPanel from './OllamaChat/APISettings';
 import { APISettings } from '../types/api';
-import { loadSavedConfigs } from '../utils/configStorage';
-import { FiMinus, FiX } from 'react-icons/fi';
+import { loadSavedConfigs, getLastUsedConfig, setLastUsedConfig } from '../utils/configStorage';
+import { FiChevronDown, FiMinus, FiX } from 'react-icons/fi';
 import MessageBubble from './OllamaChat/MessageBubble';
 import StatusIndicator from './OllamaChat/StatusIndicator';
 
@@ -22,10 +22,11 @@ const getDisplayUrl = (url: string): string => {
 
 const OllamaChat: React.FC<OllamaChatProps> = ({ onClose, onMinimize }) => {
     const [apiSettings, setApiSettings] = useState<APISettings>(() => {
-        const saved = loadSavedConfigs();
-        return saved[0] || {
+        const lastUsed = getLastUsedConfig();
+        return lastUsed || {
             serverUrl: 'http://localhost:11434/v1/chat/completions',
-            model: 'qwen2.5',
+            model: '',
+            apiKey: '',
             temperature: 1.0,
             maxTokens: 500,
             topP: 1.0,
@@ -41,6 +42,26 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose, onMinimize }) => {
     const [serverStatus, setServerStatus] = useState<'success' | 'error' | 'loading' | 'unchecked'>('unchecked');
     const [autoScroll, setAutoScroll] = useState(true);
     const [wasScrollAtBottom, setWasScrollAtBottom] = useState(true);
+    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+    const [isConfigDropdownOpen, setIsConfigDropdownOpen] = useState(false);
+    const [savedConfigs, setSavedConfigs] = useState<APISettings[]>([]);
+    const dropdownRef = useRef<HTMLDivElement>(null);
+    const [runImmediateCheck, setRunImmediateCheck] = useState(true);
+
+    useEffect(() => {
+        setSavedConfigs(loadSavedConfigs());
+    }, []);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+                setIsConfigDropdownOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     useEffect(() => {
         const scrollContainer = messagesContainerRef.current;
@@ -61,7 +82,11 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose, onMinimize }) => {
 
     useEffect(() => {
         if (autoScroll && wasScrollAtBottom && messagesContainerRef.current) {
-            messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+            requestAnimationFrame(() => {
+                if (messagesContainerRef.current) {
+                    messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+                }
+            });
         }
     }, [messages, autoScroll, wasScrollAtBottom]);
 
@@ -72,13 +97,37 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose, onMinimize }) => {
         }
     }, [messages]);
 
+    useEffect(() => {
+        const handleResize = () => {
+            const mobile = window.innerWidth < 768;
+            setIsMobile(mobile);
+            if (!mobile) {
+                setIsSettingsExpanded(true);
+            }
+        };
+
+        window.addEventListener('resize', handleResize);
+        handleResize();
+
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
+    useEffect(() => {
+        if (runImmediateCheck) {
+            setRunImmediateCheck(false);
+        }
+    }, [runImmediateCheck]);
+
     const handleSendMessage = async () => {
-        setAutoScroll(true); 
         if (!input.trim()) return;
+
+        setAutoScroll(true);
+        setWasScrollAtBottom(true);
 
         setMessages(prev => [...prev, { content: input, isUser: true }]);
         const userMessage = input;
         setInput('');
+
         try {
             const response = await fetch(apiSettings.serverUrl, {
                 method: 'POST',
@@ -106,6 +155,8 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose, onMinimize }) => {
             if (!reader) throw new Error('No reader available');
 
             let currentMessage = '';
+            let isFirstChunk = true;
+
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
@@ -120,17 +171,23 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose, onMinimize }) => {
                         const parsed = JSON.parse(line.replace('data: ', ''));
                         if (parsed.choices?.[0]?.delta?.content) {
                             currentMessage += parsed.choices[0].delta.content;
+                            
                             setMessages(prev => {
                                 const newMessages = [...prev];
                                 const lastMessage = newMessages[newMessages.length - 1];
 
                                 if (!lastMessage || lastMessage.isUser) {
+                                    if (isFirstChunk) {
+                                        setAutoScroll(true);
+                                        setWasScrollAtBottom(true);
+                                        isFirstChunk = false;
+                                    }
                                     newMessages.push({ content: currentMessage, isUser: false });
                                 } else {
                                     newMessages[newMessages.length - 1] = {
                                         content: currentMessage,
-                isUser: false
-    };
+                                        isUser: false
+                                    };
                                 }
 
                                 return newMessages;
@@ -148,7 +205,12 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose, onMinimize }) => {
                 isUser: false
             }]);
         }
-};
+    };
+
+    const handleApiSettingsChange = (newSettings: APISettings) => {
+        setApiSettings(newSettings);
+        setLastUsedConfig(newSettings);
+    };
 
     return (
         <div className="fixed inset-0 bg-gray-900 flex flex-col">
@@ -156,25 +218,67 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose, onMinimize }) => {
                 <div className="flex items-center justify-between p-4">
                     <div className="flex items-center space-x-4">
                         <h1 className="text-xl font-semibold">AI Chat</h1>
-                        <button
-                            onClick={() => setIsSettingsExpanded(true)}
-                            className="flex items-center space-x-2 px-3 py-1.5 text-sm 
-                                     bg-gray-800 rounded-full"
+                        <div className={`flex items-center space-x-2 px-3 py-1.5 text-sm 
+                                     bg-gray-800 rounded-full hover:bg-gray-700
+                                     ${isMobile ? 'cursor-pointer' : 'cursor-default'}`}
+                             onClick={(e) => {
+                                 if (!dropdownRef.current?.contains(e.target as Node)) {
+                                     isMobile && setIsSettingsExpanded(true);
+                                 }
+                             }}
                         >
                             <span className="truncate max-w-[150px]">
                                 {getDisplayUrl(apiSettings.serverUrl)}
                             </span>
                             <StatusIndicator status={serverStatus} />
-                        </button>
+                            <div className="relative" ref={dropdownRef}>
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setIsConfigDropdownOpen(!isConfigDropdownOpen);
+                                    }}
+                                    className="flex items-center space-x-1 p-1 hover:bg-gray-700 rounded-full"
+                                >
+                                    <FiChevronDown className="w-4 h-4" />
+                                </button>
+                                {isConfigDropdownOpen && (
+                                    <div style={{ right: 'max(16px, calc(100vw - 400px))' }}
+                                         className="fixed top-[60px] w-64 
+                                                  bg-gray-900 rounded-lg shadow-lg border border-gray-700 
+                                                  z-50 max-h-96 overflow-y-auto">
+                                        <div className="p-2 space-y-1">
+                                            {savedConfigs.map((config, index) => (
+                                                <button
+                                                    key={index}
+                                                    onClick={() => {
+                                                        handleApiSettingsChange(config);
+                                                        setRunImmediateCheck(true);
+                                                        setIsConfigDropdownOpen(false);
+                                                    }}
+                                                    className="w-full text-left px-3 py-2 rounded 
+                                                             bg-gray-800 hover:bg-gray-700 text-sm text-gray-200"
+                                                >
+                                                    <div className="truncate">
+                                                        {config.serverUrl}
+                                                    </div>
+                                                    <div className="text-xs text-gray-400 truncate">
+                                                        {config.model || 'No model selected'}
+                                                    </div>
+                                                </button>
+                                            ))}
+                                            {savedConfigs.length === 0 && (
+                                                <div className="px-3 py-2 text-sm text-gray-400">
+                                                    Your saved API configurations will display here for quick toggle between servers.
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     </div>
 
-                    <div className="flex items-center space-x-2">
-                        <button
-                            onClick={onMinimize}
-                            className="p-2 hover:bg-gray-800 rounded-full"
-                        >
-                            <FiMinus className="w-5 h-5" />
-                        </button>
+                    <div className="flex items-center">
                         <button
                             onClick={onClose}
                             className="p-2 hover:bg-gray-800 rounded-full"
@@ -185,8 +289,8 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose, onMinimize }) => {
                 </div>
             </div>
 
-            <div className="flex-1 flex relative overflow-hidden">
-                <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="flex-1 flex overflow-hidden">
+                <div className="flex-1 flex flex-col min-w-0">
                     <div
                         ref={messagesContainerRef}
                         className="flex-1 overflow-y-auto p-4"
@@ -222,18 +326,35 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose, onMinimize }) => {
                     </div>
                 </div>
 
-                <div className={`absolute inset-y-0 right-0 w-full md:w-[400px] bg-gray-800 
-                               shadow-xl transition-transform duration-300 transform
-                               ${isSettingsExpanded ? 'translate-x-0' : 'translate-x-full'}
-                               border-l border-gray-700`}>
+                <div className="hidden md:block w-96 border-l border-gray-700 flex-none">
                     <APISettingsPanel
                         settings={apiSettings}
-                        onSettingsChange={setApiSettings}
-                        isExpanded={isSettingsExpanded}
-                        onExpandedChange={setIsSettingsExpanded}
+                        onSettingsChange={handleApiSettingsChange}
+                        isExpanded={true}
+                        onExpandedChange={() => {}}
                         onStatusUpdate={setServerStatus}
+                        runImmediateCheck={runImmediateCheck}
                     />
                 </div>
+
+                {isMobile && (
+                    <div className={`fixed inset-0 md:hidden transition-opacity duration-300
+                                   ${isSettingsExpanded ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+                        <div className="absolute inset-0 bg-gray-900/50" />
+                        <div className={`absolute inset-y-0 right-0 w-full max-w-md bg-gray-900 
+                                       transform transition-transform duration-300
+                                       ${isSettingsExpanded ? 'translate-x-0' : 'translate-x-full'}`}>
+                            <APISettingsPanel
+                                settings={apiSettings}
+                                onSettingsChange={handleApiSettingsChange}
+                                isExpanded={isSettingsExpanded}
+                                onExpandedChange={setIsSettingsExpanded}
+                                onStatusUpdate={setServerStatus}
+                                runImmediateCheck={runImmediateCheck}
+                            />
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
