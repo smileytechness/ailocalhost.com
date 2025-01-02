@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { APISettings, parameterDescriptions, serverStatusDescriptions } from '../../types/api';
 import { Tooltip } from '../ui/Tooltip';
-import { FiInfo, FiX } from 'react-icons/fi';
+import { FiInfo, FiArrowRight } from 'react-icons/fi';
 import { SavedConfigs } from './SavedConfigs';
 import { saveConfig, setLastUsedConfig } from '../../utils/configStorage';
 
@@ -34,23 +34,23 @@ type LocalServerStatus = {
 // First, let's create a constant for the status descriptions
 const STATUS_INFO = {
     http: {
-        label: 'HTTP/S',
+        label: 'BROWSER',
         description: serverStatusDescriptions.http
     },
     lan: {
-        label: 'LAN',
+        label: 'NETWORK',
         description: serverStatusDescriptions.lan
     },
     cors: {
-        label: 'CORS',
+        label: 'SERVER',
         description: serverStatusDescriptions.cors
     }
 };
 
 const InfoIcon: React.FC<{ content: string }> = ({ content }) => (
     <Tooltip content={content}>
-        <div className="inline-block ml-1">
-            <FiInfo className="w-4 h-4 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200" />
+        <div className="inline-flex items-center justify-center">
+            <FiInfo className="w-3 h-3 text-gray-400 hover:text-gray-300" />
         </div>
     </Tooltip>
 );
@@ -175,6 +175,9 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                 if (response.status === 401 || response.status === 403) {
                     throw new Error(`Authentication failed: ${response.status}`);
                 }
+                if (response.status === 404) {
+                    throw new Error(`URL not found: ${response.status} - The server endpoint path is incorrect`);
+                }
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
@@ -199,44 +202,53 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
             console.error('Server Check Error:', error);
             let errorType: ErrorType = 'unknown';
             let errorMessage = 'An unknown error occurred.';
-            let newStatus = { ...status };
+            let newStatus = {
+                http: 'success' as LocalServerStatus['http'],
+                lan: 'success' as LocalServerStatus['lan'],
+                cors: 'success' as LocalServerStatus['cors'],
+                errors: []
+            };
 
             if (error instanceof Error) {
                 const errorMsg = error.message.toLowerCase();
                 
-                // Check for mixed content error (HTTP/S)
-                if (errorMsg.includes('mixed content')) {
+                // Check for browser-related errors (BROWSER category)
+                if (errorMsg.includes('blocked_by_client') || errorMsg.includes('mixed content')) {
                     errorType = 'mixed_content';
-                    errorMessage = 'Mixed Content Error: Cannot access HTTP server from HTTPS page.';
+                    errorMessage = 'Browser Security Error: HTTPS page cannot access HTTP server or request blocked by client.';
                     newStatus.http = 'error';
                 }
-                // Check for network errors (LAN)
+                // Check for network errors (NETWORK category)
                 else if (
                     errorMsg.includes('net::err_connection_timed_out') ||
                     errorMsg.includes('net::err_connection_refused') ||
                     errorMsg.includes('net::err_address_unreachable') ||
                     errorMsg.includes('failed to fetch') ||
-                    errorMsg.includes('network error')
+                    errorMsg.includes('404') ||
+                    errorMsg.includes('url not found')
                 ) {
                     errorType = 'network';
-                    errorMessage = 'Network Error: The server address is unreachable.';
+                    errorMessage = errorMsg.includes('404') ? 
+                        'Network Error: The server endpoint URL is incorrect. Please check the URL path.' :
+                        'Network Error: Server is unreachable on the network.';
                     newStatus.lan = 'error';
                 }
-                // Check for CORS errors
-                else if (errorMsg.includes('cors')) {
+                // Check for CORS errors (SERVER category)
+                else if (errorMsg.includes('cors') || errorMsg.includes('access-control-allow-origin')) {
                     errorType = 'cors';
-                    errorMessage = 'CORS Error: The server is not allowing requests from this origin.';
+                    errorMessage = 'Server Error: CORS policy is blocking access.';
                     newStatus.cors = 'error';
                 }
-                // Check for authentication errors
+                // Check for authentication errors (SERVER category)
                 else if (
                     errorMsg.includes('authentication failed') ||
                     errorMsg.includes('401') ||
-                    errorMsg.includes('403')
+                    errorMsg.includes('403') ||
+                    errorMsg.includes('unauthorized')
                 ) {
                     errorType = 'auth';
                     errorMessage = 'Authentication Error: Invalid or missing API key.';
-                    newStatus.http = 'error';
+                    newStatus.cors = 'error';
                 }
             }
 
@@ -331,7 +343,7 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                         onClick={() => onExpandedChange(false)}
                         className="p-2 hover:bg-gray-800 rounded-full text-gray-200"
                     >
-                        <FiX className="w-5 h-5" />
+                        <FiArrowRight className="w-5 h-5" />
                     </button>
                 </div>
             </div>
@@ -393,9 +405,6 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                             placeholder="http://localhost:11434/v1/chat/completions"
                             className="w-full p-2 border rounded bg-gray-800 text-gray-200 border-gray-700"
                         />
-                        <p className="mt-1 text-xs text-gray-400">
-                            Example: http://localhost:11434/v1/chat/completions
-                        </p>
                     </div>
 
                     {/* API Key */}
@@ -424,115 +433,226 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                             onChange={(e) => handleSettingsChange({
                                 model: e.target.value
                             })}
-                            className="w-full p-2 border rounded bg-gray-800 text-gray-200 border-gray-700"
+                            className="w-full p-2 border rounded bg-gray-800 text-gray-200 border-gray-700 text-base"
                         >
+                            <option value="" className="text-base py-2">Select a model</option>
                             {models.map((modelName, index) => (
-                                <option key={index} value={modelName}>{modelName}</option>
+                                <option key={index} value={modelName} className="text-base py-2">
+                                    {modelName}
+                                </option>
                             ))}
                         </select>
                     </div>
 
-                    {/* Temperature */}
-                    <div>
-                        <label className="block text-sm font-medium mb-1 flex items-center text-gray-200">
-                            <span>Temperature</span>
-                            <InfoIcon content={parameterDescriptions.temperature} />
-                        </label>
-                        <input
-                            type="range"
-                            min="0"
-                            max="2"
-                            step="0.1"
-                            value={settings.temperature}
-                            onChange={(e) => handleSettingsChange({
-                                temperature: parseFloat(e.target.value)
-                            })}
-                            className="w-full accent-blue-600"
-                        />
-                        <div className="text-sm text-gray-400 dark:text-gray-400">
-                            Value: {settings.temperature}
-                        </div>
-                    </div>
-
                     {/* Max Tokens */}
-                    <div>
-                        <label className="block text-sm font-medium mb-1 flex items-center text-gray-200">
-                            <span>Max Tokens</span>
-                            <InfoIcon content={parameterDescriptions.maxTokens} />
+                    <div className="p-3 bg-gray-800/50 rounded-lg">
+                        <label className="block text-sm font-medium mb-1 flex items-center justify-between text-gray-200">
+                            <div className="flex items-center">
+                                <span>Max Tokens</span>
+                                <InfoIcon content={parameterDescriptions.maxTokens} />
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <input
+                                    type="number"
+                                    value={settings.maxTokens}
+                                    onChange={(e) => {
+                                        const value = Math.min(20000, Math.max(100, parseInt(e.target.value) || 100));
+                                        handleSettingsChange({
+                                            maxTokens: value
+                                        });
+                                    }}
+                                    className="w-20 p-1 text-sm border rounded bg-gray-800 text-gray-200 border-gray-700 text-right"
+                                />
+                            </div>
                         </label>
-                        <input
-                            type="number"
-                            value={settings.maxTokens}
-                            onChange={(e) => handleSettingsChange({
-                                maxTokens: parseInt(e.target.value)
-                            })}
-                            className="w-full p-2 border rounded bg-gray-800 text-gray-200 border-gray-700"
-                        />
-                    </div>
-
-                    {/* Top P */}
-                    <div>
-                        <label className="block text-sm font-medium mb-1 flex items-center text-gray-200">
-                            <span>Top P</span>
-                            <InfoIcon content={parameterDescriptions.topP} />
-                        </label>
-                        <input
-                            type="range"
-                            min="0"
-                            max="1"
-                            step="0.1"
-                            value={settings.topP}
-                            onChange={(e) => handleSettingsChange({
-                                topP: parseFloat(e.target.value)
-                            })}
-                            className="w-full accent-blue-600"
-                        />
-                        <div className="text-sm text-gray-400 dark:text-gray-400">
-                            Value: {settings.topP}
+                        <div className="flex flex-col space-y-2">
+                            <input
+                                type="range"
+                                min="100"
+                                max="5000"
+                                step="100"
+                                value={Math.min(5000, settings.maxTokens)}
+                                onChange={(e) => handleSettingsChange({
+                                    maxTokens: parseInt(e.target.value)
+                                })}
+                                className="w-full accent-blue-600"
+                            />
+                            <div className="flex justify-between text-xs text-gray-400">
+                                <span>100</span>
+                                <span>5000</span>
+                            </div>
+                            {settings.maxTokens > 5000 && (
+                                <div className="text-xs text-yellow-500">
+                                    Warning: High token values may cause slower responses or incomplete generations
+                                </div>
+                            )}
                         </div>
                     </div>
 
-                    {/* Frequency Penalty */}
-                    <div>
-                        <label className="block text-sm font-medium mb-1 flex items-center text-gray-200">
-                            <span>Frequency Penalty</span>
-                            <InfoIcon content={parameterDescriptions.frequencyPenalty} />
-                        </label>
-                        <input
-                            type="range"
-                            min="-2"
-                            max="2"
-                            step="0.1"
-                            value={settings.frequencyPenalty}
-                            onChange={(e) => handleSettingsChange({
-                                frequencyPenalty: parseFloat(e.target.value)
-                            })}
-                            className="w-full accent-blue-600"
-                        />
-                        <div className="text-sm text-gray-400 dark:text-gray-400">
-                            Value: {settings.frequencyPenalty}
+                    {/* Temperature, Top P, Frequency Penalty, Presence Penalty in a grid */}
+                    <div className="grid grid-cols-2 gap-4">
+                        {/* Temperature */}
+                        <div className="p-3 bg-gray-800/50 rounded-lg">
+                            <label className="block text-sm font-medium mb-1 flex items-center justify-between text-gray-200">
+                                <div className="flex items-center">
+                                    <span>Temperature</span>
+                                    <InfoIcon content={parameterDescriptions.temperature} />
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <input
+                                        type="number"
+                                        value={settings.temperature}
+                                        onChange={(e) => {
+                                            const value = Math.min(2, Math.max(0, parseFloat(e.target.value) || 0));
+                                            handleSettingsChange({
+                                                temperature: value
+                                            });
+                                        }}
+                                        step="0.1"
+                                        className="w-16 p-1 text-sm border rounded bg-gray-800 text-gray-200 border-gray-700 text-right"
+                                    />
+                                </div>
+                            </label>
+                            <div className="flex flex-col space-y-2">
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="2"
+                                    step="0.1"
+                                    value={settings.temperature}
+                                    onChange={(e) => handleSettingsChange({
+                                        temperature: parseFloat(e.target.value)
+                                    })}
+                                    className="w-full accent-blue-600"
+                                />
+                                <div className="flex justify-between text-xs text-gray-400">
+                                    <span>0</span>
+                                    <span>2</span>
+                                </div>
+                            </div>
                         </div>
-                    </div>
 
-                    {/* Presence Penalty */}
-                    <div>
-                        <label className="block text-sm font-medium mb-1 flex items-center text-gray-200">
-                            <span>Presence Penalty</span>
-                            <InfoIcon content={parameterDescriptions.presencePenalty} />
-                        </label>
-                        <input
-                            type="range"
-                            min="-2"
-                            max="2"
-                            step="0.1"
-                            value={settings.presencePenalty}
-                            onChange={(e) => handleSettingsChange({
-                                presencePenalty: parseFloat(e.target.value)
-                            })}
-                            className="w-full accent-blue-600"
-                        />
-                        <div className="text-sm text-gray-400 dark:text-gray-400">
-                            Value: {settings.presencePenalty}
+                        {/* Top P */}
+                        <div className="p-3 bg-gray-800/50 rounded-lg">
+                            <label className="block text-sm font-medium mb-1 flex items-center justify-between text-gray-200">
+                                <div className="flex items-center">
+                                    <span>Top P</span>
+                                    <InfoIcon content={parameterDescriptions.topP} />
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <input
+                                        type="number"
+                                        value={settings.topP}
+                                        onChange={(e) => {
+                                            const value = Math.min(1, Math.max(0, parseFloat(e.target.value) || 0));
+                                            handleSettingsChange({
+                                                topP: value
+                                            });
+                                        }}
+                                        step="0.1"
+                                        className="w-16 p-1 text-sm border rounded bg-gray-800 text-gray-200 border-gray-700 text-right"
+                                    />
+                                </div>
+                            </label>
+                            <div className="flex flex-col space-y-2">
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="1"
+                                    step="0.1"
+                                    value={settings.topP}
+                                    onChange={(e) => handleSettingsChange({
+                                        topP: parseFloat(e.target.value)
+                                    })}
+                                    className="w-full accent-blue-600"
+                                />
+                                <div className="flex justify-between text-xs text-gray-400">
+                                    <span>0</span>
+                                    <span>1</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Frequency Penalty */}
+                        <div className="p-3 bg-gray-800/50 rounded-lg">
+                            <label className="block text-sm font-medium mb-1 flex items-center justify-between text-gray-200">
+                                <div className="flex items-center">
+                                    <span>Frequency Penalty</span>
+                                    <InfoIcon content={parameterDescriptions.frequencyPenalty} />
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <input
+                                        type="number"
+                                        value={settings.frequencyPenalty}
+                                        onChange={(e) => {
+                                            const value = Math.min(2, Math.max(-2, parseFloat(e.target.value) || 0));
+                                            handleSettingsChange({
+                                                frequencyPenalty: value
+                                            });
+                                        }}
+                                        step="0.1"
+                                        className="w-16 p-1 text-sm border rounded bg-gray-800 text-gray-200 border-gray-700 text-right"
+                                    />
+                                </div>
+                            </label>
+                            <div className="flex flex-col space-y-2">
+                                <input
+                                    type="range"
+                                    min="-2"
+                                    max="2"
+                                    step="0.1"
+                                    value={settings.frequencyPenalty}
+                                    onChange={(e) => handleSettingsChange({
+                                        frequencyPenalty: parseFloat(e.target.value)
+                                    })}
+                                    className="w-full accent-blue-600"
+                                />
+                                <div className="flex justify-between text-xs text-gray-400">
+                                    <span>-2</span>
+                                    <span>2</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Presence Penalty */}
+                        <div className="p-3 bg-gray-800/50 rounded-lg">
+                            <label className="block text-sm font-medium mb-1 flex items-center justify-between text-gray-200">
+                                <div className="flex items-center">
+                                    <span>Presence Penalty</span>
+                                    <InfoIcon content={parameterDescriptions.presencePenalty} />
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <input
+                                        type="number"
+                                        value={settings.presencePenalty}
+                                        onChange={(e) => {
+                                            const value = Math.min(2, Math.max(-2, parseFloat(e.target.value) || 0));
+                                            handleSettingsChange({
+                                                presencePenalty: value
+                                            });
+                                        }}
+                                        step="0.1"
+                                        className="w-16 p-1 text-sm border rounded bg-gray-800 text-gray-200 border-gray-700 text-right"
+                                    />
+                                </div>
+                            </label>
+                            <div className="flex flex-col space-y-2">
+                                <input
+                                    type="range"
+                                    min="-2"
+                                    max="2"
+                                    step="0.1"
+                                    value={settings.presencePenalty}
+                                    onChange={(e) => handleSettingsChange({
+                                        presencePenalty: parseFloat(e.target.value)
+                                    })}
+                                    className="w-full accent-blue-600"
+                                />
+                                <div className="flex justify-between text-xs text-gray-400">
+                                    <span>-2</span>
+                                    <span>2</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -555,10 +675,10 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
     );
 };
 
-// Update the StatusRow component to center the info icon
+// Update the StatusRow component to be more compact
 const StatusRow: React.FC<{ label: keyof typeof STATUS_INFO; status: string }> = ({ label, status }) => (
-    <div className="flex items-center space-x-2 bg-gray-800 p-2 rounded-full text-gray-200">
-        <span className="text-xs">{STATUS_INFO[label].label}</span>
+    <div className="flex items-center h-8 px-2 space-x-1.5 bg-gray-800 rounded-full text-gray-200">
+        <span className="text-[11px] font-medium">{STATUS_INFO[label].label}</span>
         <div className="flex items-center">
             <InfoIcon content={STATUS_INFO[label].description} />
         </div>

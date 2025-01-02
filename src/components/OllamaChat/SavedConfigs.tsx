@@ -10,25 +10,22 @@ interface SavedConfigsProps {
 export const SavedConfigs: React.FC<SavedConfigsProps> = ({ onLoadConfig }) => {
     const [configs, setConfigs] = useState<APISettings[]>(loadSavedConfigs());
 
-    // Refresh configs when localStorage changes
+    // Refresh configs when they change
     useEffect(() => {
         const handleStorageChange = () => {
             setConfigs(loadSavedConfigs());
         };
 
-        window.addEventListener('storage', handleStorageChange);
-        // Also set up an interval to check for changes
-        const interval = setInterval(handleStorageChange, 1000);
-
+        // Listen for our custom event
+        window.addEventListener('savedConfigsUpdated', handleStorageChange);
+        
         return () => {
-            window.removeEventListener('storage', handleStorageChange);
-            clearInterval(interval);
+            window.removeEventListener('savedConfigsUpdated', handleStorageChange);
         };
     }, []);
 
     const handleDelete = (id: string) => {
         deleteConfig(id);
-        setConfigs(loadSavedConfigs());
     };
 
     const handleLoadConfig = (config: APISettings) => {
@@ -43,11 +40,15 @@ export const SavedConfigs: React.FC<SavedConfigsProps> = ({ onLoadConfig }) => {
             presencePenalty: config.presencePenalty || 0
         };
         
-        // Force a new state by creating a new object
-        onLoadConfig({
-            ...loadedConfig,
-            serverUrl: config.serverUrl + '', // Force string copy
-        });
+        onLoadConfig(loadedConfig);
+    };
+
+    const getDisplayName = (url: string) => {
+        try {
+            return new URL(url).hostname;
+        } catch {
+            return url;
+        }
     };
 
     return (
@@ -55,29 +56,37 @@ export const SavedConfigs: React.FC<SavedConfigsProps> = ({ onLoadConfig }) => {
             <h3 className="text-lg font-semibold mb-2">Saved Configurations</h3>
             <div className="space-y-2">
                 {configs.map(config => (
-                    <div key={config.id} className="flex items-center justify-between p-2 bg-gray-700 rounded">
-                        <div className="flex-1">
-                            <span
+                    <div 
+                        key={config.id} 
+                        className="flex items-center justify-between p-3 bg-gray-700/50 rounded-lg hover:bg-gray-700/70 transition-colors"
+                    >
+                        <div className="flex-1 min-w-0">
+                            <div
                                 onClick={() => handleLoadConfig(config)}
-                                className="cursor-pointer hover:text-blue-400"
+                                className="cursor-pointer hover:text-blue-400 font-medium truncate"
                             >
-                                {new URL(config.serverUrl).hostname}
-                            </span>
-                            <div className="text-sm text-gray-400">
-                                <div>Model: {config.model || 'Not set'}</div>
-                                <div>Max Tokens: {config.maxTokens}, API: {config.apiKey ? 'Yes' : 'No'}</div>
+                                {getDisplayName(config.serverUrl)}
+                            </div>
+                            <div className="text-sm text-gray-400 space-y-0.5">
+                                <div className="truncate">Model: {config.model || 'Not set'}</div>
+                                <div>
+                                    Max Tokens: {config.maxTokens}
+                                    <span className="mx-2">•</span>
+                                    API: {config.apiKey ? 'Yes' : 'No'}
+                                </div>
                             </div>
                         </div>
                         <button
                             onClick={() => handleDelete(config.id!)}
-                            className="p-1 text-red-400 hover:text-red-300"
+                            className="p-2 text-gray-400 hover:text-red-400 transition-colors"
+                            title="Delete configuration"
                         >
                             <FiTrash2 className="w-4 h-4" />
                         </button>
                     </div>
                 ))}
                 {configs.length === 0 && (
-                    <div className="text-sm text-gray-400 text-center py-2">
+                    <div className="text-sm text-gray-400 text-center py-4 bg-gray-800/30 rounded-lg">
                         No saved configurations
                     </div>
                 )}

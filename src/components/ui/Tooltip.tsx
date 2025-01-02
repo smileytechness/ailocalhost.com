@@ -1,114 +1,165 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import { Portal } from './Portal';
 
 interface TooltipProps {
     content: string;
     children: React.ReactNode;
 }
 
-// Add a custom CodeBlock component
-const CodeBlock: React.FC<{ children: string; className?: string }> = ({ children, className }) => {
-    return (
-        <div className="my-2">
-            <pre className="not-prose bg-gray-800 dark:bg-gray-700 p-2 rounded text-xs overflow-x-auto">
-                <code className={className}>{children}</code>
-            </pre>
-        </div>
-    );
-};
+const CodeBlock: React.FC<{ children: string }> = ({ children }) => (
+    <div className="my-2 px-3 py-2 bg-gray-900 rounded-md border border-gray-700 font-mono text-[11px] overflow-x-auto whitespace-pre-wrap break-all">
+        {children}
+    </div>
+);
+
+const InlineCode: React.FC<{ children: string }> = ({ children }) => (
+    <code className="px-1.5 py-0.5 mx-0.5 bg-gray-900 rounded font-mono text-[11px] whitespace-nowrap">
+        {children}
+    </code>
+);
+
+const Link: React.FC<{ href: string; children: React.ReactNode }> = ({ href, children }) => (
+    <a 
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-blue-400 underline hover:text-blue-300"
+    >
+        {children}
+    </a>
+);
 
 export const Tooltip: React.FC<TooltipProps> = ({ content, children }) => {
-    const [show, setShow] = useState(false);
-    const triggerRef = useRef<HTMLDivElement>(null);
+    const [isVisible, setIsVisible] = useState(false);
+    const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 });
     const tooltipRef = useRef<HTMLDivElement>(null);
-    const [position, setPosition] = useState({ top: 0, left: 0 });
+    const triggerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        if (show && triggerRef.current && tooltipRef.current) {
-            const triggerRect = triggerRef.current.getBoundingClientRect();
-            const tooltipRect = tooltipRef.current.getBoundingClientRect();
-            
-            // Calculate position
-            let top = triggerRect.bottom + window.scrollY + 8;
-            let left = triggerRect.left + window.scrollX + (triggerRect.width / 2);
-
-            // Adjust for right edge overflow
-            const maxRight = window.innerWidth - 20; // 20px padding from edge
-            const tooltipRight = left + (tooltipRect.width / 2);
-            if (tooltipRight > maxRight) {
-                left = maxRight - (tooltipRect.width / 2);
+        const handleClickOutside = (event: MouseEvent) => {
+            if (tooltipRef.current && !tooltipRef.current.contains(event.target as Node)) {
+                setIsVisible(false);
             }
+        };
 
-            // Adjust for left edge overflow
-            const minLeft = 20; // 20px padding from edge
-            const tooltipLeft = left - (tooltipRect.width / 2);
-            if (tooltipLeft < minLeft) {
-                left = (tooltipRect.width / 2) + minLeft;
-            }
-
-            setPosition({ top, left });
+        if (isVisible) {
+            document.addEventListener('mousedown', handleClickOutside);
+            requestAnimationFrame(updatePosition);
+            window.addEventListener('scroll', updatePosition, true);
+            window.addEventListener('resize', updatePosition);
         }
-    }, [show]);
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+            window.removeEventListener('scroll', updatePosition, true);
+            window.removeEventListener('resize', updatePosition);
+        };
+    }, [isVisible]);
+
+    const updatePosition = () => {
+        if (!tooltipRef.current || !triggerRef.current) return;
+
+        const triggerRect = triggerRef.current.getBoundingClientRect();
+        const tooltipRect = tooltipRef.current.getBoundingClientRect();
+        const viewportHeight = window.innerHeight;
+        const viewportWidth = window.innerWidth;
+
+        let top = triggerRect.bottom + 8;
+        let left = triggerRect.left + (triggerRect.width / 2) - (tooltipRect.width / 2);
+
+        left = Math.max(20, left);
+        left = Math.min(left, viewportWidth - tooltipRect.width - 20);
+
+        const spaceBelow = viewportHeight - triggerRect.bottom;
+        const spaceAbove = triggerRect.top;
+        const tooltipHeight = tooltipRect.height;
+
+        if (spaceBelow < tooltipHeight + 8 && spaceAbove > spaceBelow) {
+            top = triggerRect.top - tooltipHeight - 8;
+        }
+
+        top = Math.max(20, Math.min(top, viewportHeight - tooltipHeight - 20));
+
+        setTooltipPosition({ 
+            top: top + window.scrollY, 
+            left: left + window.scrollX 
+        });
+    };
+
+    const handleClick = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsVisible(!isVisible);
+    };
 
     return (
-        <>
+        <div className="relative inline-block" ref={triggerRef}>
             <div
-                ref={triggerRef}
-                className="relative inline-block"
-                onMouseEnter={() => setShow(true)}
-                onMouseLeave={() => setShow(false)}
+                onClick={handleClick}
+                className="cursor-pointer"
             >
                 {children}
             </div>
-            {show && (
-                <Portal>
-                    <div
-                        ref={tooltipRef}
-                        style={{
-                            position: 'absolute',
-                            top: position.top,
-                            left: position.left,
-                            transform: 'translateX(-50%)',
-                            maxWidth: '400px',
-                            width: 'max-content',
-                        }}
-                        className="z-[9999] p-3 text-sm bg-gray-900 dark:bg-gray-800 
-                                 text-white rounded-lg shadow-lg whitespace-normal"
-                    >
-                        <div className="prose prose-sm prose-invert max-w-none">
+            {isVisible && (
+                <div 
+                    ref={tooltipRef}
+                    className="fixed z-[9999]"
+                    style={{
+                        top: tooltipPosition.top,
+                        left: tooltipPosition.left,
+                        width: '384px',
+                        maxWidth: 'calc(100vw - 40px)'
+                    }}
+                >
+                    <div className="bg-gray-800 text-gray-200 p-4 rounded-lg shadow-lg border border-gray-700">
+                        <div 
+                            className="overflow-y-auto font-inter text-[13px] leading-relaxed"
+                            style={{ maxHeight: 'calc(100vh - 100px)' }}
+                        >
                             <ReactMarkdown
-                                remarkPlugins={[remarkGfm]}
                                 components={{
-                                    code({ node, inline, className, children, ...props }) {
-                                        if (inline) {
-                                            return (
-                                                <code className="bg-gray-800 dark:bg-gray-700 px-1 py-0.5 rounded text-xs" {...props}>
-                                                    {children}
-                                                </code>
-                                            );
-                                        }
-                                        const code = String(children).replace(/\n$/, '');
-                                        return <CodeBlock className={className}>{code}</CodeBlock>;
-                                    },
+                                    code: ({ inline, children }) => 
+                                        inline ? (
+                                            <InlineCode>{children as string}</InlineCode>
+                                        ) : (
+                                            <CodeBlock>{children as string}</CodeBlock>
+                                        ),
+                                    a: ({ href, children }) => <Link href={href || '#'}>{children}</Link>,
+                                    h2: ({ children }) => (
+                                        <h2 className="text-[15px] font-bold text-white mb-2">
+                                            {children}
+                                        </h2>
+                                    ),
                                     p: ({ children }) => (
-                                        <p className="mb-2 last:mb-0 break-words">{children}</p>
+                                        <p className="mb-3 text-gray-300 break-words">
+                                            {children}
+                                        </p>
                                     ),
                                     ul: ({ children }) => (
-                                        <ul className="list-disc ml-4 mb-2 space-y-1">{children}</ul>
+                                        <ul className="mb-3 space-y-2 text-gray-300">
+                                            {children}
+                                        </ul>
                                     ),
                                     li: ({ children }) => (
-                                        <li className="break-words">{children}</li>
+                                        <li className="flex gap-2 break-words">
+                                            <span className="text-gray-500 flex-shrink-0">•</span>
+                                            <span className="flex-1 min-w-0">{children}</span>
+                                        </li>
+                                    ),
+                                    strong: ({ children }) => (
+                                        <strong className="font-bold text-white">
+                                            {children}
+                                        </strong>
                                     )
                                 }}
                             >
                                 {content}
                             </ReactMarkdown>
+                            <div className="h-px bg-gradient-to-r from-transparent via-gray-700 to-transparent mt-4" />
                         </div>
                     </div>
-                </Portal>
+                </div>
             )}
-        </>
+        </div>
     );
 }; 

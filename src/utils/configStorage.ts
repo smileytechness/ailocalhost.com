@@ -11,17 +11,26 @@ export const loadSavedConfigs = (): APISettings[] => {
 
 export const saveConfig = (config: APISettings): APISettings => {
     const configs = loadSavedConfigs();
-    const existingIndex = configs.findIndex(c => c.serverUrl === config.serverUrl);
+    
+    // Create a new config with a unique ID
+    const newConfig = {
+        ...config,
+        id: crypto.randomUUID()
+    };
 
-    if (existingIndex >= 0) {
-        configs[existingIndex] = config;
-    } else {
-        configs.push(config);
-    }
-
+    // Add the new config to the list
+    configs.push(newConfig);
+    
+    // Save to localStorage
     localStorage.setItem(STORAGE_KEY, JSON.stringify(configs));
+    
+    // Update last used config
     setLastUsedConfig(config);
-    return config;
+    
+    // Dispatch storage event for other components
+    window.dispatchEvent(new Event('savedConfigsUpdated'));
+    
+    return newConfig;
 };
 
 export const setLastUsedConfig = (config: APISettings): void => {
@@ -37,8 +46,11 @@ export const getLastUsedConfig = (): APISettings | null => {
     return savedConfigs.length > 0 ? savedConfigs[0] : null;
 };
 
-export const deleteConfig = (serverUrl: string): void => {
+export const deleteConfig = (id: string): void => {
     const configs = loadSavedConfigs();
-    const newConfigs = configs.filter(c => c.serverUrl !== serverUrl);
+    const newConfigs = configs.filter(c => c.id !== id);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(newConfigs));
+    
+    // Dispatch storage event for other components
+    window.dispatchEvent(new Event('savedConfigsUpdated'));
 };

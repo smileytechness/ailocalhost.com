@@ -14,6 +14,9 @@ export default {
           light: '#60A5FA',
         },
       },
+      fontFamily: {
+        'chat': ['Inter', 'system-ui', 'sans-serif'],
+      },
     },
   },
   plugins: [],

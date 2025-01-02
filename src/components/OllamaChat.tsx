@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import APISettingsPanel from './OllamaChat/APISettings';
 import { APISettings } from '../types/api';
 import { loadSavedConfigs, getLastUsedConfig, setLastUsedConfig } from '../utils/configStorage';
-import { FiChevronDown, FiX } from 'react-icons/fi';
+import { FiChevronDown, FiX, FiClock, FiTrash2 } from 'react-icons/fi';
 import MessageBubble from './OllamaChat/MessageBubble';
 import StatusIndicator from './OllamaChat/StatusIndicator';
 
@@ -24,11 +24,11 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose }) => {
         const lastUsed = getLastUsedConfig();
         return lastUsed || {
             serverUrl: 'http://localhost:11434/v1/chat/completions',
-            model: '',
+            model: 'llama3.2',
             apiKey: '',
-            temperature: 1.0,
+            temperature: 0.2,
             maxTokens: 500,
-            topP: 1.0,
+            topP: 0.5,
             frequencyPenalty: 0,
             presencePenalty: 0
         };
@@ -37,6 +37,7 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose }) => {
     const [messages, setMessages] = useState<Array<{ content: string; isUser: boolean }>>([]);
     const [input, setInput] = useState('');
     const messagesContainerRef = useRef<HTMLDivElement>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
     const [isSettingsExpanded, setIsSettingsExpanded] = useState(false);
     const [serverStatus, setServerStatus] = useState<'success' | 'error' | 'loading' | 'unchecked'>('unchecked');
     const [autoScroll, setAutoScroll] = useState(true);
@@ -46,13 +47,27 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose }) => {
     const [savedConfigs, setSavedConfigs] = useState<APISettings[]>([]);
     const dropdownRef = useRef<HTMLDivElement>(null);
     const [runImmediateCheck, setRunImmediateCheck] = useState(true);
+    const [isHistoryDropdownOpen, setIsHistoryDropdownOpen] = useState(false);
+    const historyDropdownRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         setSavedConfigs(loadSavedConfigs());
+        
+        const handleConfigUpdate = () => {
+            setSavedConfigs(loadSavedConfigs());
+        };
+        
+        window.addEventListener('savedConfigsUpdated', handleConfigUpdate);
+        return () => {
+            window.removeEventListener('savedConfigsUpdated', handleConfigUpdate);
+        };
     }, []);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
+            if (historyDropdownRef.current && !historyDropdownRef.current.contains(event.target as Node)) {
+                setIsHistoryDropdownOpen(false);
+            }
             if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
                 setIsConfigDropdownOpen(false);
             }
@@ -117,11 +132,27 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose }) => {
         }
     }, [runImmediateCheck]);
 
+    const adjustTextareaHeight = () => {
+        const textarea = textareaRef.current;
+        if (textarea) {
+            textarea.style.height = 'auto';
+            textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
+        }
+    };
+
+    useEffect(() => {
+        adjustTextareaHeight();
+    }, [input]);
+
     const handleSendMessage = async () => {
         if (!input.trim()) return;
 
         setAutoScroll(true);
         setWasScrollAtBottom(true);
+
+        if (textareaRef.current) {
+            textareaRef.current.style.height = '42px';
+        }
 
         setMessages(prev => [...prev, { content: input, isUser: true }]);
         const userMessage = input;
@@ -212,7 +243,7 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose }) => {
     };
 
     return (
-        <div className="fixed inset-0 bg-gray-900 flex flex-col">
+        <div className="fixed inset-0 bg-gray-900 flex flex-col font-chat">
             <div className="flex-none border-b border-gray-700">
                 <div className="flex items-center justify-between p-4">
                     <div className="flex items-center space-x-4">
@@ -245,35 +276,101 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose }) => {
                                          className="fixed top-[60px] w-64 
                                                   bg-gray-900 rounded-lg shadow-lg border border-gray-700 
                                                   z-50 max-h-96 overflow-y-auto">
-                                        <div className="p-2 space-y-1">
-                                            {savedConfigs.map((config, index) => (
-                                                <button
-                                                    key={index}
-                                                    onClick={() => {
-                                                        handleApiSettingsChange(config);
-                                                        setRunImmediateCheck(true);
-                                                        setIsConfigDropdownOpen(false);
-                                                    }}
-                                                    className="w-full text-left px-3 py-2 rounded 
-                                                             bg-gray-800 hover:bg-gray-700 text-sm text-gray-200"
-                                                >
-                                                    <div className="truncate">
-                                                        {config.serverUrl}
+                                        <div className="p-2">
+                                            <div className="text-sm font-medium text-gray-200 px-2 py-1 mb-1">
+                                                Saved Configurations
+                                            </div>
+                                            <div className="space-y-1">
+                                                {savedConfigs.map((config, index) => (
+                                                    <button
+                                                        key={index}
+                                                        onClick={() => {
+                                                            handleApiSettingsChange(config);
+                                                            setRunImmediateCheck(true);
+                                                            setIsConfigDropdownOpen(false);
+                                                        }}
+                                                        className="w-full text-left px-3 py-2 rounded 
+                                                                 bg-gray-800 hover:bg-gray-700 text-sm text-gray-200"
+                                                    >
+                                                        <div className="truncate">
+                                                            {config.serverUrl}
+                                                        </div>
+                                                        <div className="text-xs text-gray-400 truncate">
+                                                            {config.model || 'No model selected'}
+                                                        </div>
+                                                    </button>
+                                                ))}
+                                                {savedConfigs.length === 0 && (
+                                                    <div className="px-3 py-2 text-sm text-gray-400">
+                                                        Your saved API configurations will display here for quick toggle between servers.
                                                     </div>
-                                                    <div className="text-xs text-gray-400 truncate">
-                                                        {config.model || 'No model selected'}
-                                                    </div>
-                                                </button>
-                                            ))}
-                                            {savedConfigs.length === 0 && (
-                                                <div className="px-3 py-2 text-sm text-gray-400">
-                                                    Your saved API configurations will display here for quick toggle between servers.
-                                                </div>
-                                            )}
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 )}
                             </div>
+                        </div>
+                        <div className="relative" ref={historyDropdownRef}>
+                            <button
+                                onClick={() => setIsHistoryDropdownOpen(!isHistoryDropdownOpen)}
+                                className="flex items-center space-x-1 px-3.5 py-2 bg-gray-800 hover:bg-gray-700 rounded-full"
+                                title="Chat History"
+                            >
+                                <FiClock className="w-4.5 h-4.5" />
+                            </button>
+                            {isHistoryDropdownOpen && (
+                                <div style={{ right: 'max(16px, calc(100vw - 400px))' }}
+                                     className="fixed top-[60px] w-64 
+                                              bg-gray-900 rounded-lg shadow-lg border border-gray-700 
+                                              z-50 max-h-96 overflow-y-auto">
+                                    <div className="p-2">
+                                        <div className="text-sm font-medium text-gray-200 px-2 py-1 mb-1">
+                                            Chat History
+                                        </div>
+                                        <div className="px-2 space-y-1">
+                                            <div className="group relative rounded bg-gray-800 hover:bg-gray-700 transition-colors">
+                                                <div 
+                                                    className="w-full text-left p-2 cursor-pointer"
+                                                    onClick={() => {
+                                                        // Handle chat selection here
+                                                        console.log('Chat selected');
+                                                    }}
+                                                >
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="text-sm text-gray-200 font-medium truncate">
+                                                                Example Chat Session (Mock)
+                                                            </div>
+                                                            <div className="flex items-center text-xs text-gray-400 space-x-2">
+                                                                <span>Just now</span>
+                                                                <span className="opacity-50">•</span>
+                                                                <span className="font-mono opacity-50">mock_123</span>
+                                                            </div>
+                                                        </div>
+                                                        <button 
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                console.log('Delete clicked');
+                                                            }}
+                                                            className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-600 rounded transition-opacity"
+                                                            title="Delete chat"
+                                                        >
+                                                            <FiTrash2 className="w-4 h-4 text-gray-400 hover:text-gray-200" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="mt-2 mx-2 p-2 text-xs bg-yellow-500/10 border border-yellow-500/20 rounded">
+                                            <div className="font-medium text-yellow-200">Under Construction</div>
+                                            <div className="mt-1 text-yellow-100/70">
+                                                Chat history functionality is currently being implemented. You'll be able to save, view, and manage your chat sessions here.
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -295,23 +392,70 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose }) => {
                         className="flex-1 overflow-y-auto p-4"
                     >
                         <div className="max-w-3xl mx-auto space-y-4">
-                            {messages.map((message, index) => (
-                                <MessageBubble key={index} message={message} />
-                            ))}
+                            {messages.length === 0 ? (
+                                <div className="h-full flex items-center justify-center min-h-[80vh]">
+                                    <div className="max-w-lg w-full text-left space-y-6 text-gray-600">
+                                        <div className="text-sm text-gray-500">
+                                            Start chatting with AI. Enter your AI server URL to get started.
+                                        </div>
+                                        
+                                        <div className="space-y-2">
+                                        <div className="text-sm">
+                                                Looking to setup your own AI server?
+                                            </div>
+                                            <div className="text-sm">
+                                                Install Ollama to get started with your very own locally hosted AI.
+                                            </div>
+                                            <div className="text-sm space-y-1">
+                                                <div>1. Install Ollama - <a href="https://ollama.com" target="_blank" rel="noopener noreferrer" className="text-blue-400/80 hover:text-blue-300/80">click here to download</a></div>
+                                                <div>2. Open a terminal and run: <code className="bg-gray-800/50 px-1.5 py-0.5 rounded text-gray-400 text-xs">ollama pull llama3.2</code></div>
+                                                <div>3. Set: <code className="bg-gray-800/50 px-1.5 py-0.5 rounded text-gray-400 text-xs">export OLLAMA_HOST=0.0.0.0</code> and: <code className="bg-gray-800/50 px-1.5 py-0.5 rounded text-gray-400 text-xs">export OLLAMA_ORIGINS=https://ailocalhost.com</code></div>
+                                                <div>4. Find your device IP address and start Ollama: <code className="bg-gray-800/50 px-1.5 py-0.5 rounded text-gray-400 text-xs">ollama serve</code></div>
+                                            </div>
+                                        </div>
+
+                                        <div className="text-sm">
+                                            <div>
+                                            You're all set! Open the API settings (next to the drop down above) and enter your host IP address into Server URL like this: <code className="bg-gray-800/50 px-1.5 py-0.5 rounded text-gray-400 text-xs">http://yourip:11434/v1/chat/completions</code>
+                                           </div>
+                                           <br></br>
+                                            <div className="mt-1 text-xs">
+                                                See the server status helpers in the API settings console for advanced troubleshooting.
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                messages.map((message, index) => (
+                                    <MessageBubble key={index} message={message} />
+                                ))
+                            )}
                         </div>
                     </div>
 
                     <div className="flex-none border-t border-gray-700">
                         <div className="max-w-3xl mx-auto p-4">
                             <div className="flex items-center space-x-2">
-                                <input
-                                    type="text"
+                                <textarea
+                                    ref={textareaRef}
                                     value={input}
                                     onChange={(e) => setInput(e.target.value)}
-                                    onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && !e.shiftKey) {
+                                            e.preventDefault();
+                                            handleSendMessage();
+                                        }
+                                    }}
                                     placeholder="Type a message..."
+                                    rows={1}
+                                    style={{
+                                        minHeight: '42px',
+                                        maxHeight: '200px',
+                                        height: 'auto',
+                                        resize: 'none'
+                                    }}
                                     className="flex-1 p-2 bg-gray-800 border border-gray-700 
-                                             rounded-lg focus:ring-2 focus:ring-blue-500"
+                                             rounded-lg focus:ring-2 focus:ring-blue-500 overflow-y-auto"
                                 />
                                 <button
                                     onClick={handleSendMessage}
