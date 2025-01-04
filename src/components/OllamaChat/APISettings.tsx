@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { APISettings, parameterDescriptions, serverStatusDescriptions } from '../../types/api';
 import { Tooltip } from '../ui/Tooltip';
-import { FiInfo, FiArrowRight } from 'react-icons/fi';
+import { FiInfo, FiArrowRight, FiSidebar } from 'react-icons/fi';
 import { SavedConfigs } from './SavedConfigs';
 import { saveConfig, setLastUsedConfig } from '../../utils/configStorage';
 
@@ -291,7 +291,7 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
     };
 
     return (
-        <div className="h-full flex flex-col bg-gray-900">
+        <div className="h-full flex flex-col bg-gray-900 api-settings-panel">
             {/* Always show title on desktop */}
             <div className="hidden md:flex flex-col p-4 border-b border-gray-700">
                 <div className="flex items-center justify-between">
@@ -303,17 +303,26 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                             </div>
                         )}
                     </div>
-                    <button
-                        onClick={checkServerStatus}
-                        disabled={isChecking}
-                        className={`px-4 py-1.5 text-sm rounded-md ${
-                            isChecking
-                                ? 'bg-gray-700 cursor-not-allowed'
-                                : 'bg-blue-700 hover:bg-blue-800'
-                        } text-gray-200 transition-colors`}
-                    >
-                        {isChecking ? 'Checking...' : 'Check Connection'}
-                    </button>
+                    <div className="flex items-center space-x-3">
+                        <button
+                            onClick={checkServerStatus}
+                            disabled={isChecking}
+                            className={`px-4 py-1.5 text-sm rounded-md ${
+                                isChecking
+                                    ? 'bg-gray-700 cursor-not-allowed'
+                                    : 'bg-blue-700 hover:bg-blue-800'
+                            } text-gray-200 transition-colors`}
+                        >
+                            {isChecking ? 'Checking...' : 'Check Connection'}
+                        </button>
+                        <button
+                            onClick={() => onExpandedChange(false)}
+                            className="p-2 hover:bg-gray-800 rounded-full text-gray-200"
+                            title="Toggle API Settings"
+                        >
+                            <FiSidebar className="w-5 h-5" />
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -477,10 +486,7 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                                 })}
                                 className="w-full accent-blue-600"
                             />
-                            <div className="flex justify-between text-xs text-gray-400">
-                                <span>100</span>
-                                <span>5000</span>
-                            </div>
+
                             {settings.maxTokens > 5000 && (
                                 <div className="text-xs text-yellow-500">
                                     Warning: High token values may cause slower responses or incomplete generations
@@ -525,10 +531,7 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                                     })}
                                     className="w-full accent-blue-600"
                                 />
-                                <div className="flex justify-between text-xs text-gray-400">
-                                    <span>0</span>
-                                    <span>2</span>
-                                </div>
+
                             </div>
                         </div>
 
@@ -566,10 +569,7 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                                     })}
                                     className="w-full accent-blue-600"
                                 />
-                                <div className="flex justify-between text-xs text-gray-400">
-                                    <span>0</span>
-                                    <span>1</span>
-                                </div>
+
                             </div>
                         </div>
 
@@ -607,10 +607,7 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                                     })}
                                     className="w-full accent-blue-600"
                                 />
-                                <div className="flex justify-between text-xs text-gray-400">
-                                    <span>-2</span>
-                                    <span>2</span>
-                                </div>
+
                             </div>
                         </div>
 
@@ -648,10 +645,7 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                                     })}
                                     className="w-full accent-blue-600"
                                 />
-                                <div className="flex justify-between text-xs text-gray-400">
-                                    <span>-2</span>
-                                    <span>2</span>
-                                </div>
+
                             </div>
                         </div>
                     </div>

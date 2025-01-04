@@ -3,6 +3,7 @@ import APISettingsPanel from './OllamaChat/APISettings';
 import { APISettings } from '../types/api';
 import { loadSavedConfigs, getLastUsedConfig, setLastUsedConfig } from '../utils/configStorage';
 import { FiChevronDown, FiX, FiClock, FiTrash2 } from 'react-icons/fi';
+import { FiSettings } from 'react-icons/fi';
 import MessageBubble from './OllamaChat/MessageBubble';
 import StatusIndicator from './OllamaChat/StatusIndicator';
 
@@ -115,7 +116,7 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose }) => {
         const handleResize = () => {
             const mobile = window.innerWidth < 768;
             setIsMobile(mobile);
-            if (!mobile) {
+            if (!mobile && isSettingsExpanded) {
                 setIsSettingsExpanded(true);
             }
         };
@@ -247,16 +248,18 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose }) => {
             <div className="flex-none border-b border-gray-700">
                 <div className="flex items-center justify-between p-4">
                     <div className="flex items-center space-x-4">
-                        <h1 className="text-xl font-semibold">AI Chat</h1>
+                        <h1 className="text-xl font-semibold">Chat</h1>
                         <div className={`flex items-center space-x-2 px-3 py-1.5 text-sm 
                                      bg-gray-800 rounded-full hover:bg-gray-700
-                                     ${isMobile ? 'cursor-pointer' : 'cursor-default'}`}
+                                     cursor-pointer`}
                              onClick={(e) => {
                                  if (!dropdownRef.current?.contains(e.target as Node)) {
-                                     isMobile && setIsSettingsExpanded(true);
+                                     setIsSettingsExpanded(!isSettingsExpanded);
                                  }
                              }}
                         >
+                              <FiSettings className="w-4 h-4" /> {/* Added settings icon here */}
+  
                             <span className="truncate max-w-[150px]">
                                 {getDisplayUrl(apiSettings.serverUrl)}
                             </span>
@@ -386,7 +389,7 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose }) => {
             </div>
 
             <div className="flex-1 flex overflow-hidden">
-                <div className="flex-1 flex flex-col min-w-0">
+                <div className={`flex-1 flex flex-col min-w-0 transition-[padding-right] duration-300 ease-in-out ${isSettingsExpanded ? 'md:pr-96' : ''}`}>
                     <div
                         ref={messagesContainerRef}
                         className="flex-1 overflow-y-auto p-4"
@@ -469,11 +472,11 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose }) => {
                     </div>
                 </div>
 
-                <div className="hidden md:block w-96 border-l border-gray-700 flex-none">
+                <div className={`hidden md:block border-l border-gray-700 flex-none fixed right-0 top-[73px] bottom-0 w-96 transform transition-transform duration-300 ease-in-out ${isSettingsExpanded ? 'translate-x-0' : 'translate-x-full'} bg-gray-900`}>
                     <APISettingsPanel
                         settings={apiSettings}
                         onSettingsChange={handleApiSettingsChange}
-                        onExpandedChange={() => {}}
+                        onExpandedChange={setIsSettingsExpanded}
                         onStatusUpdate={setServerStatus}
                         runImmediateCheck={runImmediateCheck}
                     />
