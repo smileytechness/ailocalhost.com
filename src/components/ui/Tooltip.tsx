@@ -28,7 +28,7 @@ export const Tooltip: React.FC<TooltipProps> = ({ content, children }) => {
   const [isVisible, setIsVisible] = useState(false);
   const tooltipRef = useRef<HTMLDivElement>(null);
 
-  const handleClick = (e: React.MouseEvent) => {
+  const handleClick = () => {
     setIsVisible(!isVisible);
   };
 
