@@ -51,6 +51,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
     className="rounded-md"
     style={{
         ...oneDark,
+        'backgroundColor': '#1e1e1e',
         '& .LineNumbers': {
             'fontSize': '10px',
             'fontStyle': 'normal',

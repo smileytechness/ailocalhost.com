@@ -465,7 +465,7 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                                     type="number"
                                     value={settings.maxTokens}
                                     onChange={(e) => {
-                                        const value = Math.min(20000, Math.max(100, parseInt(e.target.value) || 100));
+                                        const value = Math.min(2000000, Math.max(100, parseInt(e.target.value) || 100));
                                         handleSettingsChange({
                                             maxTokens: value
                                         });
@@ -478,16 +478,16 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                             <input
                                 type="range"
                                 min="100"
-                                max="5000"
+                                max="8000"
                                 step="100"
-                                value={Math.min(5000, settings.maxTokens)}
+                                value={Math.min(8000, settings.maxTokens)}
                                 onChange={(e) => handleSettingsChange({
                                     maxTokens: parseInt(e.target.value)
                                 })}
                                 className="w-full accent-blue-600"
                             />
 
-                            {settings.maxTokens > 5000 && (
+                            {settings.maxTokens > 8000 && (
                                 <div className="text-xs text-yellow-500">
                                     Warning: High token values may cause slower responses or incomplete generations
                                 </div>
