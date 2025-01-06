@@ -6,7 +6,6 @@ import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCopy, faEye, faEyeSlash, faChevronDown, faChevronUp, faCode, faXmark, faShieldHalved } from '@fortawesome/free-solid-svg-icons';
 import DOMPurify from 'dompurify';
-import { Switch } from '../ui/Switch';
 
 interface MessageBubbleProps {
     message: {
@@ -59,7 +58,7 @@ const HTMLPreviewModal = memo(({ html, onClose }: { html: string; onClose: () =>
 
     return (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-fade-in">
-            {showWarning && hasScripts ? (
+            {showWarning && hasScripts && userChoice === null ? (
                 // Warning Modal
                 <div className="bg-gray-900 rounded-lg shadow-xl w-full max-w-md p-4 animate-slide-up">
                     <div className="flex items-center justify-between text-yellow-500 mb-3">
