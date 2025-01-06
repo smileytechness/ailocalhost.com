@@ -68,6 +68,7 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose }) => {
     const totalSlides = 2;
     const [isToolsExpanded, setIsToolsExpanded] = useState(false);
     const toolsRef = useRef<HTMLDivElement>(null);
+    const [sendChatContext, setSendChatContext] = useState(true);
 
     const nextSlide = () => setActiveSlide((prev) => (prev + 1) % totalSlides);
     const prevSlide = () => setActiveSlide((prev) => (prev - 1 + totalSlides) % totalSlides);
@@ -174,6 +175,14 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose }) => {
         adjustTextareaHeight();
     }, [input]);
 
+    const formatChatHistoryForContext = (messages: ChatMessage[]): string => {
+        return messages.map(msg => {
+            const timestamp = msg.timestamp.toLocaleString();
+            const role = msg.isUser ? "User:" : "Your response:";
+            return `[${timestamp}] ${role}: ${msg.content}`;
+        }).join('\n');
+    };
+
     const handleSendMessage = async () => {
         if (!input.trim()) return;
 
@@ -199,6 +208,14 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose }) => {
         setInput('');
 
         try {
+            let messageContent = userMessage;
+            
+            // Append chat history if sendChatContext is enabled
+            if (sendChatContext && messages.length > 0) {
+                const chatHistory = formatChatHistoryForContext(messages);
+                messageContent = `${messageContent}\n\nCONTEXT:\n\n${chatHistory}`;
+            }
+
             const response = await fetch(apiSettings.serverUrl, {
                 method: 'POST',
                 headers: {
@@ -207,7 +224,7 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose }) => {
                 },
                 body: JSON.stringify({
                     model: apiSettings.model,
-                    messages: [{ role: "user", content: userMessage }],
+                    messages: [{ role: "user", content: messageContent }],
                     max_tokens: apiSettings.maxTokens,
                     temperature: apiSettings.temperature,
                     top_p: apiSettings.topP,
@@ -218,6 +235,9 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose }) => {
             });
 
             if (!response.ok) {
+                if (response.status === 413) {
+                    throw new Error('Error 413: The message payload was too large. This usually means either the chat session history is too big or the max tokens setting is too small for the full context of the message.');
+                }
                 throw new Error(`Error! status: ${response.status}`);
             }
 
@@ -276,8 +296,9 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose }) => {
         } catch (error) {
             console.error('Error sending message:', error);
             setMessages(prev => [...prev, {
-                content: 'Error: Failed to get response from server',
+                content: error instanceof Error ? error.message : 'Error: Failed to get response from server',
                 isUser: false,
+                isError: true,
                 timestamp: new Date()
             }]);
         }
@@ -732,10 +753,27 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose }) => {
                                             <div className="text-sm font-medium text-gray-200 px-2 py-1 mb-1">
                                                 Chat Services
                                             </div>
-                                            <div className="mt-2 p-2 text-xs bg-yellow-500/10 border border-yellow-500/20 rounded">
-                                                <div className="font-medium text-yellow-200">Under Construction</div>
-                                                <div className="mt-1 text-yellow-100/70">
-                                                    Chat services configuration including LangChain integration, chat modes, and other AI service settings will be available here soon.
+                                            <div className="space-y-2">
+                                                <div className="p-2 rounded bg-gray-800 hover:bg-gray-750">
+                                                    <div className="flex items-center justify-between">
+                                                        <div>
+                                                            <div className="text-sm text-gray-200">Send Chat Context</div>
+                                                            <div className="text-xs text-gray-400">
+                                                                Append the chat history to each message sent in order to provide the context for the LLM.
+                                                            </div>
+                                                        </div>
+                                                        <Switch
+                                                            checked={sendChatContext}
+                                                            onCheckedChange={setSendChatContext}
+                                                            className="data-[state=checked]:bg-blue-500"
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div className="mt-2 p-2 text-xs bg-yellow-500/10 border border-yellow-500/20 rounded">
+                                                    <div className="font-medium text-yellow-200">Under Construction</div>
+                                                    <div className="mt-1 text-yellow-100/70">
+                                                        Additional chat services configuration including LangChain integration, chat modes, and other AI service settings will be available here soon.
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>

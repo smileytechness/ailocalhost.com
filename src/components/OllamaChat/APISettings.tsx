@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { APISettings, parameterDescriptions, serverStatusDescriptions } from '../../types/api';
 import { Tooltip } from '../ui/Tooltip';
-import { FiInfo, FiSidebar, FiRefreshCw, FiChevronDown } from 'react-icons/fi';
+import { FiInfo, FiSidebar, FiRefreshCw, FiChevronDown, FiEye, FiEyeOff } from 'react-icons/fi';
 import { SavedConfigs } from './SavedConfigs';
 import { loadSavedConfigs, saveConfig, setLastUsedConfig } from '../../utils/configStorage';
 import { useTheme } from '../../context/ThemeContext';
@@ -91,6 +91,7 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
     const [activeTab, setActiveTab] = useState<'api' | 'general'>('api');
     const { darkMode, toggleDarkMode } = useTheme();
     const [isChecking, setIsChecking] = useState(false);
+    const [showApiKey, setShowApiKey] = useState(false);
     const [status, setStatus] = useState<LocalServerStatus>({
         http: 'unchecked',
         cors: 'unchecked',
@@ -892,6 +893,11 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
         setImportSummary(null);
     };
 
+    // Add a function to mask the API key
+    const getMaskedApiKey = (key: string) => {
+        return '*'.repeat(key.length);
+    };
+
     return (
         <div className="h-full flex flex-col bg-gray-900 api-settings-panel md:w-auto w-[375px]">
             {/* Header with tabs */}
@@ -1010,14 +1016,24 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                                     <span>API Key</span>
                                     <InfoIcon content={parameterDescriptions.apiKey} />
                                 </label>
-                                <input
-                                    type="text"
-                                    value={settings.apiKey}
-                                    onChange={(e) => handleSettingsChange({
-                                        apiKey: e.target.value
-                                    })}
-                                    className="flex-1 p-1.5 text-sm border rounded bg-gray-800 text-gray-200 border-gray-700"
-                                />
+                                <div className="flex-1 relative">
+                                    <input
+                                        type="text"
+                                        value={showApiKey ? settings.apiKey : getMaskedApiKey(settings.apiKey)}
+                                        onChange={(e) => handleSettingsChange({
+                                            apiKey: e.target.value
+                                        })}
+                                        className="w-full p-1.5 pr-8 text-sm border rounded bg-gray-800 text-gray-200 border-gray-700"
+                                    />
+                                    <div className="absolute inset-y-[1px] right-8 w-6 bg-gradient-to-r from-transparent to-gray-800 pointer-events-none rounded-r" />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowApiKey(!showApiKey)}
+                                        className="absolute inset-y-[1px] right-[1px] w-7 flex items-center justify-center text-gray-400 hover:text-gray-300 rounded-r"
+                                    >
+                                        {showApiKey ? <FiEyeOff className="w-4 h-4" /> : <FiEye className="w-4 h-4" />}
+                                    </button>
+                                </div>
                             </div>
 
                             {/* Model Selection */}
