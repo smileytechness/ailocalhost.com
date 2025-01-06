@@ -9,6 +9,7 @@ export interface APISettings {
     topP: number;
     frequencyPenalty: number;
     presencePenalty: number;
+    timestamp?: string;
 }
 
 export const parameterDescriptions = {

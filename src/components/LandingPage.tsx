@@ -14,11 +14,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartChat }) => {
         <main className="min-h-screen w-full">
             {/* Header */}
             <header className="bg-gray-800 shadow-md fixed top-0 w-full z-50">
-                <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-                    <h1 className="text-2xl font-bold">
+                <div className="container mx-auto px-2 sm:px-4 py-3 sm:py-4 flex items-center justify-between">
+                    <h1 className="text-2xl font-bold pl-1 sm:pl-2">
                         ai<span className="font-extrabold text-blue-400">local</span>host.com
                     </h1>
-                    <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-2 sm:space-x-4">
                         <a 
                             href="https://github.com/smileytechness/ailocalhost.com"
                             className="hidden md:flex items-center px-3 py-2 bg-gray-700 hover:bg-gray-600 
@@ -30,7 +30,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartChat }) => {
                         </a>
                         <a 
                             href="https://github.com/smileytechness/ailocalhost.com"
-                            className="md:hidden p-0.5 text-gray-300 hover:text-white transition"
+                            className="md:hidden px-2 text-gray-300 hover:text-white transition"
                             target="_blank"
                             rel="noopener noreferrer"
                             aria-label="View on GitHub"
@@ -41,8 +41,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartChat }) => {
                         </a>
                         <button
                             onClick={handleStartChat}
-                            className="px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white font-semibold 
-                                     rounded-lg transition text-sm whitespace-nowrap"
+                            className="px-2 sm:px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white font-semibold 
+                                     rounded-lg transition text-sm whitespace-nowrap min-w-[80px]"
                         >
                             Open Chat
                         </button>

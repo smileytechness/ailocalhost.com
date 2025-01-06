@@ -6,16 +6,24 @@ const LAST_USED_KEY = 'ollama_last_used_config';
 
 export const loadSavedConfigs = (): APISettings[] => {
     const savedConfigs = localStorage.getItem(STORAGE_KEY);
-    return savedConfigs ? JSON.parse(savedConfigs) : [];
+    const configs = savedConfigs ? JSON.parse(savedConfigs) : [];
+    
+    // Sort by timestamp in descending order (most recent first)
+    return configs.sort((a: APISettings, b: APISettings) => {
+        const timeA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+        const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+        return timeB - timeA;
+    });
 };
 
 export const saveConfig = (config: APISettings): APISettings => {
     const configs = loadSavedConfigs();
     
-    // Create a new config with a unique ID
+    // Create a new config with a unique ID and timestamp
     const newConfig = {
         ...config,
-        id: crypto.randomUUID()
+        id: crypto.randomUUID(),
+        timestamp: new Date().toISOString()
     };
 
     // Add the new config to the list

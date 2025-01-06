@@ -53,32 +53,36 @@ export const SavedConfigs: React.FC<SavedConfigsProps> = ({ onLoadConfig }) => {
 
     return (
         <div className="mt-4">
-            <h3 className="text-lg font-semibold mb-2">Saved Configurations</h3>
-            <div className="space-y-2">
+            <h3 className="text-base font-semibold mb-2">Saved Configurations</h3>
+            <div className="space-y-1">
                 {configs.map(config => (
                     <div 
                         key={config.id} 
-                        className="flex items-center justify-between p-3 bg-gray-700/50 rounded-lg hover:bg-gray-700/70 transition-colors"
+                        className="flex items-start justify-between p-2 bg-gray-700/50 rounded-lg hover:bg-gray-700/70 transition-colors"
                     >
                         <div className="flex-1 min-w-0">
-                            <div
-                                onClick={() => handleLoadConfig(config)}
-                                className="cursor-pointer hover:text-blue-400 font-medium truncate"
-                            >
-                                {getDisplayName(config.serverUrl)}
-                            </div>
-                            <div className="text-sm text-gray-400 space-y-0.5">
-                                <div className="truncate">Model: {config.model || 'Not set'}</div>
-                                <div>
-                                    Max Tokens: {config.maxTokens}
-                                    <span className="mx-2">•</span>
-                                    API: {config.apiKey ? 'Yes' : 'No'}
-                                </div>
+                            <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                                <span
+                                    onClick={() => handleLoadConfig(config)}
+                                    className="cursor-pointer hover:text-blue-400 font-bold text-sm"
+                                >
+                                    {getDisplayName(config.serverUrl)}
+                                </span>
+                                <span className="text-gray-500">•</span>
+                                <span className="text-gray-300">{config.model || 'No model'}</span>
+                                <span className="text-gray-500">•</span>
+                                <span className="text-gray-400">MaxTK:{config.maxTokens}</span>
+                                <span className="text-gray-500">•</span>
+                                <span className="text-gray-400">Key:{config.apiKey ? 'yes' : 'no'}</span>
+                                <span className="text-gray-500">•</span>
+                                <span className="text-gray-400">t:{config.temperature?.toFixed(1)}</span>
+                                <span className="text-gray-500">•</span>
+                                <span className="text-gray-400">p:{config.topP?.toFixed(1)}</span>
                             </div>
                         </div>
                         <button
                             onClick={() => handleDelete(config.id!)}
-                            className="p-2 text-gray-400 hover:text-red-400 transition-colors"
+                            className="p-1.5 text-gray-400 hover:text-red-400 transition-colors ml-2 flex-shrink-0"
                             title="Delete configuration"
                         >
                             <FiTrash2 className="w-4 h-4" />
@@ -86,7 +90,7 @@ export const SavedConfigs: React.FC<SavedConfigsProps> = ({ onLoadConfig }) => {
                     </div>
                 ))}
                 {configs.length === 0 && (
-                    <div className="text-sm text-gray-400 text-center py-4 bg-gray-800/30 rounded-lg">
+                    <div className="text-sm text-gray-400 text-center py-3 bg-gray-800/30 rounded-lg">
                         No saved configurations
                     </div>
                 )}
