@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { APISettings, parameterDescriptions, serverStatusDescriptions } from '../../types/api';
 import { Tooltip } from '../ui/Tooltip';
-import { FiInfo, FiArrowRight, FiSidebar } from 'react-icons/fi';
+import { FiInfo, FiArrowRight, FiSidebar, FiRefreshCw, FiChevronDown } from 'react-icons/fi';
 import { SavedConfigs } from './SavedConfigs';
 import { saveConfig, setLastUsedConfig } from '../../utils/configStorage';
 
@@ -295,10 +295,10 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
             {/* Always show title on desktop */}
             <div className="hidden md:flex flex-col p-4 border-b border-gray-700">
                 <div className="flex items-center justify-between">
-                    <div>
-                        <h2 className="text-lg font-semibold text-gray-200">API Settings</h2>
+                    <div className="flex items-center gap-4">
+                        <h2 className="text-lg font-semibold text-gray-200 whitespace-nowrap">API Settings</h2>
                         {countdown !== null && (
-                            <div className="text-[10px] text-gray-400 -mt-1">
+                            <div className="text-[10px] text-gray-400 whitespace-nowrap">
                                 Checking in {countdown.toFixed(1)}s
                             </div>
                         )}
@@ -307,13 +307,17 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                         <button
                             onClick={checkServerStatus}
                             disabled={isChecking}
-                            className={`px-4 py-1.5 text-sm rounded-md ${
+                            className={`p-2 rounded-full transition-all duration-200 ${
                                 isChecking
                                     ? 'bg-gray-700 cursor-not-allowed'
-                                    : 'bg-blue-700 hover:bg-blue-800'
-                            } text-gray-200 transition-colors`}
+                                    : 'hover:bg-gray-700'
+                            }`}
                         >
-                            {isChecking ? 'Checking...' : 'Check Connection'}
+                            <FiRefreshCw 
+                                className={`w-4 h-4 text-gray-200 transition-transform duration-700 ${
+                                    isChecking ? 'animate-spin' : ''
+                                }`}
+                            />
                         </button>
                         <button
                             onClick={() => onExpandedChange(false)}
@@ -328,10 +332,10 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
 
             {/* Only show close button on mobile */}
             <div className="md:hidden flex items-center justify-between p-4 border-b border-gray-700">
-                <div>
-                    <h2 className="text-lg font-semibold text-gray-200">API Settings</h2>
+                <div className="flex items-center gap-4">
+                    <h2 className="text-lg font-semibold text-gray-200 whitespace-nowrap">API Settings</h2>
                     {countdown !== null && (
-                        <div className="text-[10px] text-gray-400 -mt-1">
+                        <div className="text-[10px] text-gray-400 whitespace-nowrap">
                             Checking in {countdown.toFixed(1)}s
                         </div>
                     )}
@@ -340,13 +344,17 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                     <button
                         onClick={checkServerStatus}
                         disabled={isChecking}
-                        className={`px-4 py-1.5 text-sm rounded-md ${
+                        className={`p-2 rounded-full transition-all duration-200 ${
                             isChecking
                                 ? 'bg-gray-700 cursor-not-allowed'
-                                : 'bg-blue-700 hover:bg-blue-800'
-                        } text-gray-200 transition-colors`}
+                                : 'hover:bg-gray-700'
+                        }`}
                     >
-                        {isChecking ? 'Checking...' : 'Check Connection'}
+                        <FiRefreshCw 
+                            className={`w-4 h-4 text-gray-200 transition-transform duration-700 ${
+                                isChecking ? 'animate-spin' : ''
+                            }`}
+                        />
                     </button>
                     <button
                         onClick={() => onExpandedChange(false)}
@@ -382,80 +390,87 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
 
             {/* Scrollable content */}
             <div className="flex-1 overflow-y-auto">
-                <div className="p-4 space-y-6">
-                    {/* Server URL */}
-                    <div>
-                        <label className="block text-sm font-medium mb-1 text-gray-200">
-                            Server URL
-                        </label>
-                        <input
-                            type="text"
-                            value={settings.serverUrl}
-                            onChange={(e) => {
-                                // Basic URL validation before updating
-                                try {
-                                    if (e.target.value && !e.target.value.startsWith('http')) {
-                                        // Automatically add http:// if missing
+                <div className="p-4 space-y-4">
+                    {/* Server URL and API Key in a unified element */}
+                    <div className="p-3 bg-gray-800/50 rounded-lg space-y-2">
+                        {/* Server URL */}
+                        <div className="flex items-center">
+                            <label className="text-xs font-medium text-gray-200 w-24">
+                                Server URL
+                            </label>
+                            <input
+                                type="text"
+                                value={settings.serverUrl}
+                                onChange={(e) => {
+                                    try {
+                                        if (e.target.value && !e.target.value.startsWith('http')) {
+                                            handleSettingsChange({
+                                                serverUrl: `http://${e.target.value}`
+                                            });
+                                        } else {
+                                            handleSettingsChange({
+                                                serverUrl: e.target.value
+                                            });
+                                        }
+                                    } catch (e) {
                                         handleSettingsChange({
-                                            serverUrl: `http://${e.target.value}`
-                                        });
-                                    } else {
-                                        handleSettingsChange({
-                                            serverUrl: e.target.value
+                                            serverUrl: (e as React.ChangeEvent<HTMLInputElement>).target.value
                                         });
                                     }
-                                } catch (e) {
-                                    // If there's an error, just update the raw text
-                                    handleSettingsChange({
-                                        serverUrl: (e as React.ChangeEvent<HTMLInputElement>).target.value
-                                    });
-                                }
-                            }}
-                            placeholder="http://localhost:11434/v1/chat/completions"
-                            className="w-full p-2 border rounded bg-gray-800 text-gray-200 border-gray-700"
-                        />
-                    </div>
+                                }}
+                                placeholder="http://localhost:11434/v1/chat/completions"
+                                className="flex-1 p-1.5 text-sm border rounded bg-gray-800 text-gray-200 border-gray-700"
+                            />
+                        </div>
 
-                    {/* API Key */}
-                    <div>
-                        <label className="block text-sm font-medium mb-1 flex items-center text-gray-200">
-                            <span>API Key</span>
-                            <InfoIcon content={parameterDescriptions.apiKey} />
-                        </label>
-                        <input
-                            type="text"
-                            value={settings.apiKey}
-                            onChange={(e) => handleSettingsChange({
-                                apiKey: e.target.value
-                            })}
-                            className="w-full p-2 border rounded bg-gray-800 text-gray-200 border-gray-700"
-                        />
+                        {/* API Key */}
+                        <div className="flex items-center">
+                            <label className="text-xs font-medium text-gray-200 w-24 flex items-center">
+                                <span>API Key</span>
+                                <InfoIcon content={parameterDescriptions.apiKey} />
+                            </label>
+                            <input
+                                type="text"
+                                value={settings.apiKey}
+                                onChange={(e) => handleSettingsChange({
+                                    apiKey: e.target.value
+                                })}
+                                className="flex-1 p-1.5 text-sm border rounded bg-gray-800 text-gray-200 border-gray-700"
+                            />
+                        </div>
                     </div>
 
                     {/* Model Selection */}
-                    <div>
-                        <label className="block text-sm font-medium mb-1 text-gray-200">
-                            Model
-                        </label>
-                        <select
-                            value={settings.model}
-                            onChange={(e) => handleSettingsChange({
-                                model: e.target.value
-                            })}
-                            className="w-full p-2 border rounded bg-gray-800 text-gray-200 border-gray-700 text-base"
-                        >
-                            <option value="" className="text-base py-2">Select a model</option>
-                            {models.map((modelName, index) => (
-                                <option key={index} value={modelName} className="text-base py-2">
-                                    {modelName}
-                                </option>
-                            ))}
-                        </select>
+                    <div className="p-3 bg-gray-800/50 rounded-lg">
+                        <div className="flex items-center">
+                            <label className="text-xs font-medium text-gray-200 w-24">
+                                Model
+                            </label>
+                            <div className="flex-1 relative">
+                                <select
+                                    value={settings.model}
+                                    onChange={(e) => handleSettingsChange({
+                                        model: e.target.value
+                                    })}
+                                    className="w-full p-1.5 text-sm border rounded bg-gray-800 text-gray-200 border-gray-700 appearance-none"
+                                >
+                                    <option value="" className="text-sm">Select a model</option>
+                                    {models.map((modelName, index) => (
+                                        <option key={index} value={modelName} className="text-sm">
+                                            {modelName}
+                                        </option>
+                                    ))}
+                                </select>
+                                <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                                    <FiChevronDown className="h-4 w-4 text-gray-400" />
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     {/* Max Tokens */}
                     <div className="p-3 bg-gray-800/50 rounded-lg">
-                        <label className="block text-sm font-medium mb-1 flex items-center justify-between text-gray-200">
+                        <label className="block text-xs font-medium mb-1 flex items-center justify-between text-gray-200">
                             <div className="flex items-center">
                                 <span>Max Tokens</span>
                                 <InfoIcon content={parameterDescriptions.maxTokens} />
@@ -499,7 +514,7 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                     <div className="grid grid-cols-2 gap-4">
                         {/* Temperature */}
                         <div className="p-3 bg-gray-800/50 rounded-lg">
-                            <label className="block text-sm font-medium mb-1 flex items-center justify-between text-gray-200">
+                            <label className="block text-xs font-medium mb-1 flex items-center justify-between text-gray-200">
                                 <div className="flex items-center">
                                     <span>Temperature</span>
                                     <InfoIcon content={parameterDescriptions.temperature} />
@@ -515,7 +530,7 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                                             });
                                         }}
                                         step="0.1"
-                                        className="w-16 p-1 text-sm border rounded bg-gray-800 text-gray-200 border-gray-700 text-right"
+                                        className="w-12 p-1 text-sm border rounded bg-gray-800 text-gray-200 border-gray-700 text-right"
                                     />
                                 </div>
                             </label>
@@ -531,13 +546,12 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                                     })}
                                     className="w-full accent-blue-600"
                                 />
-
                             </div>
                         </div>
 
                         {/* Top P */}
                         <div className="p-3 bg-gray-800/50 rounded-lg">
-                            <label className="block text-sm font-medium mb-1 flex items-center justify-between text-gray-200">
+                            <label className="block text-xs font-medium mb-1 flex items-center justify-between text-gray-200">
                                 <div className="flex items-center">
                                     <span>Top P</span>
                                     <InfoIcon content={parameterDescriptions.topP} />
@@ -553,7 +567,7 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                                             });
                                         }}
                                         step="0.1"
-                                        className="w-16 p-1 text-sm border rounded bg-gray-800 text-gray-200 border-gray-700 text-right"
+                                        className="w-12 p-1 text-sm border rounded bg-gray-800 text-gray-200 border-gray-700 text-right"
                                     />
                                 </div>
                             </label>
@@ -569,13 +583,12 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                                     })}
                                     className="w-full accent-blue-600"
                                 />
-
                             </div>
                         </div>
 
                         {/* Frequency Penalty */}
                         <div className="p-3 bg-gray-800/50 rounded-lg">
-                            <label className="block text-sm font-medium mb-1 flex items-center justify-between text-gray-200">
+                            <label className="block text-xs font-medium mb-1 flex items-center justify-between text-gray-200">
                                 <div className="flex items-center">
                                     <span>Frequency Penalty</span>
                                     <InfoIcon content={parameterDescriptions.frequencyPenalty} />
@@ -591,7 +604,7 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                                             });
                                         }}
                                         step="0.1"
-                                        className="w-16 p-1 text-sm border rounded bg-gray-800 text-gray-200 border-gray-700 text-right"
+                                        className="w-12 p-1 text-sm border rounded bg-gray-800 text-gray-200 border-gray-700 text-right"
                                     />
                                 </div>
                             </label>
@@ -607,13 +620,12 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                                     })}
                                     className="w-full accent-blue-600"
                                 />
-
                             </div>
                         </div>
 
                         {/* Presence Penalty */}
                         <div className="p-3 bg-gray-800/50 rounded-lg">
-                            <label className="block text-sm font-medium mb-1 flex items-center justify-between text-gray-200">
+                            <label className="block text-xs font-medium mb-1 flex items-center justify-between text-gray-200">
                                 <div className="flex items-center">
                                     <span>Presence Penalty</span>
                                     <InfoIcon content={parameterDescriptions.presencePenalty} />
@@ -629,7 +641,7 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                                             });
                                         }}
                                         step="0.1"
-                                        className="w-16 p-1 text-sm border rounded bg-gray-800 text-gray-200 border-gray-700 text-right"
+                                        className="w-12 p-1 text-sm border rounded bg-gray-800 text-gray-200 border-gray-700 text-right"
                                     />
                                 </div>
                             </label>
@@ -645,24 +657,23 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                                     })}
                                     className="w-full accent-blue-600"
                                 />
-
                             </div>
                         </div>
                     </div>
 
-                    {/* Save configuration button */}
+                    {/* Save configuration section */}
                     <div className="mt-4 border-t border-gray-700 pt-4">
                         <button
                             onClick={handleSaveConfig}
-                            className="w-full px-4 py-2 bg-blue-700 text-gray-200 rounded 
-                                     hover:bg-blue-800 transition-colors duration-200"
+                            className="float-right px-3 py-1.5 bg-blue-500 hover:bg-blue-600 
+                                     text-white text-sm rounded-lg whitespace-nowrap"
                         >
-                            Save Current Configuration
+                            Save Current Config
                         </button>
-                    </div>
 
-                    {/* SavedConfigs component */}
-                    <SavedConfigs onLoadConfig={onSettingsChange} />
+                        {/* SavedConfigs component */}
+                        <SavedConfigs onLoadConfig={onSettingsChange} />
+                    </div>
                 </div>
             </div>
         </div>
