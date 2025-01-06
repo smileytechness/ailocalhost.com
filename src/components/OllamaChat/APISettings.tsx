@@ -894,7 +894,8 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
     };
 
     // Add a function to mask the API key
-    const getMaskedApiKey = (key: string) => {
+    const getMaskedApiKey = (key: string | undefined) => {
+        if (!key) return '';
         return '*'.repeat(key.length);
     };
 
@@ -1019,7 +1020,7 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                                 <div className="flex-1 relative">
                                     <input
                                         type="text"
-                                        value={showApiKey ? settings.apiKey : getMaskedApiKey(settings.apiKey)}
+                                        value={showApiKey ? (settings.apiKey || '') : getMaskedApiKey(settings.apiKey)}
                                         onChange={(e) => handleSettingsChange({
                                             apiKey: e.target.value
                                         })}
