@@ -88,10 +88,11 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
     onStatusUpdate,
     runImmediateCheck
 }) => {
-    const [activeTab, setActiveTab] = useState<'api' | 'general'>('api');
+    const [activeTab, setActiveTab] = useState<'api' | 'general' | 'applications'>('api');
     const { darkMode, toggleDarkMode } = useTheme();
     const [isChecking, setIsChecking] = useState(false);
     const [showApiKey, setShowApiKey] = useState(false);
+    const [saveSuccess, setSaveSuccess] = useState(false);
     const [status, setStatus] = useState<LocalServerStatus>({
         http: 'unchecked',
         cors: 'unchecked',
@@ -315,11 +316,11 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
         setLastUsedConfig(updatedSettings);
     };
 
-    // Add save handler
+    // Add save handler with animation
     const handleSaveConfig = () => {
         const newConfig = saveConfig({
             ...settings,
-            model: settings.model || '',  // Ensure model is saved
+            model: settings.model || '',
             temperature: settings.temperature || 0.7,
             maxTokens: settings.maxTokens || 2000,
             topP: settings.topP || 1,
@@ -328,6 +329,10 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
         });
         // Update the settings with the new config
         onSettingsChange(newConfig);
+        
+        // Show success animation
+        setSaveSuccess(true);
+        setTimeout(() => setSaveSuccess(false), 1500);
     };
 
     // Function to calculate storage breakdown
@@ -893,94 +898,107 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
         setImportSummary(null);
     };
 
-    // Add a function to mask the API key
-    const getMaskedApiKey = (key: string | undefined) => {
-        if (!key) return '';
-        return '*'.repeat(key.length);
-    };
-
     return (
-        <div className="h-full flex flex-col bg-gray-900 api-settings-panel md:w-auto w-[375px]">
+        <div className="h-full flex flex-col bg-gray-900 api-settings-panel min-w-[360px] max-w-[383px] w-full min-[375px]:w-[375px] md:w-auto md:max-w-none md:min-w-0">
             {/* Header with tabs */}
             <div className="flex-none p-3 border-b border-gray-700">
-                <div className="flex items-center justify-between">
-                    {/* Tabs */}
-                    <div className="flex space-x-2">
-                        <TabButton 
-                            label="API Settings" 
-                            isActive={activeTab === 'api'} 
-                            onClick={() => setActiveTab('api')} 
-                        />
-                        <TabButton 
-                            label="General" 
-                            isActive={activeTab === 'general'} 
-                            onClick={() => setActiveTab('general')} 
-                        />
+                <div className="flex flex-col space-y-3">
+                     <div className="flex items-center justify-between">
+                        {/* Tabs */}
+                        <div className="flex space-x-2">
+                            <TabButton 
+                                label="Servers" 
+                                isActive={activeTab === 'api'} 
+                                onClick={() => setActiveTab('api')} 
+                            />
+                            <TabButton 
+                                label="Applications" 
+                                isActive={activeTab === 'applications'} 
+                                onClick={() => setActiveTab('applications')} 
+                            />
+                            <TabButton 
+                                label="General" 
+                                isActive={activeTab === 'general'} 
+                                onClick={() => setActiveTab('general')} 
+                            />
+                        </div>
+                        <button
+                            onClick={() => onExpandedChange(false)}
+                            className="p-1.5 hover:bg-gray-800 rounded-full text-gray-200"
+                            title="Toggle API Settings"
+                        >
+                            <FiSidebar className="w-4 h-4" />
+                        </button>
                     </div>
-                    <button
-                        onClick={() => onExpandedChange(false)}
-                        className="p-1.5 hover:bg-gray-800 rounded-full text-gray-200"
-                        title="Toggle API Settings"
-                    >
-                        <FiSidebar className="w-4 h-4" />
-                    </button>
                 </div>
             </div>
-
-            {/* Status indicators - only show in API tab */}
-            {activeTab === 'api' && (
-                <div className="flex-none p-4 border-b border-gray-700">
-                    <div className="flex items-center space-x-2">
-                        <StatusRow label="http" status={status.http} />
-                        <StatusRow label="lan" status={status.lan} />
-                        <StatusRow label="cors" status={status.cors} />
-                        <div className="flex flex-col items-center">
-                            <button
-                                onClick={checkServerStatus}
-                                disabled={isChecking}
-                                className={`h-7 px-2 flex items-center bg-gray-800 rounded-full transition-all duration-200 ${
-                                    isChecking
-                                        ? 'bg-gray-700 cursor-not-allowed'
-                                        : 'hover:bg-gray-700'
-                                }`}
-                            >
-                                <FiRefreshCw 
-                                    className={`w-3 h-3 text-gray-200 transition-transform duration-700 ${
-                                        isChecking ? 'animate-spin' : ''
-                                    }`}
-                                />
-                            </button>
-                            {countdown !== null && (
-                                <div className="text-[10px] text-gray-400 mt-0.5 whitespace-nowrap">
-                                    {countdown.toFixed(1)}s
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {status.errors.length > 0 && (
-                        <div className="mt-2 p-3 bg-red-900/20 rounded-md">
-                            <h4 className="text-sm font-medium text-red-200">Errors:</h4>
-                            <ul className="mt-1 text-sm text-red-300">
-                                {status.errors.map((error, index) => (
-                                    <li key={index}>
-                                        <strong>{error.message}</strong>
-                                        {error.details && <p className="text-xs mt-1">{error.details}</p>}
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-                    )}
-                </div>
-            )}
 
             {/* Content area */}
             <div className="flex-1 overflow-y-auto">
                 {activeTab === 'api' ? (
                     // Original API Settings content
                     <div className="p-4 space-y-4">
+                        {/* Server Status Indicators */}
+                        <div className="flex items-center space-x-2 flex-wrap gap-y-2">
+                            <StatusRow label="http" status={status.http} />
+                            <StatusRow label="lan" status={status.lan} />
+                            <StatusRow label="cors" status={status.cors} />
+                            <div className="flex flex-col items-center">
+                                <button
+                                    onClick={checkServerStatus}
+                                    disabled={isChecking}
+                                    className={`h-7 px-2 flex items-center bg-gray-800 rounded-full transition-all duration-200 ${
+                                        isChecking
+                                            ? 'bg-gray-700 cursor-not-allowed'
+                                            : 'hover:bg-gray-700'
+                                    }`}
+                                >
+                                    <FiRefreshCw 
+                                        className={`w-3 h-3 text-gray-200 transition-transform duration-700 ${
+                                            isChecking ? 'animate-spin' : ''
+                                        }`}
+                                    />
+                                </button>
+                                {countdown !== null && (
+                                    <div className="text-[10px] text-gray-400 mt-0.5 whitespace-nowrap">
+                                        {countdown.toFixed(1)}s
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {status.errors.length > 0 && (
+                            <div className="mt-2 p-3 bg-red-900/20 rounded-md">
+                                <h4 className="text-sm font-medium text-red-200">Errors:</h4>
+                                <ul className="mt-1 text-sm text-red-300">
+                                    {status.errors.map((error, index) => (
+                                        <li key={index}>
+                                            <strong>{error.message}</strong>
+                                            {error.details && <p className="text-xs mt-1">{error.details}</p>}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+
+                        {/* Save configuration section */}
+                        <div className="space-y-2 relative z-50">
+                            <div className="flex gap-2 text-xs">
+                                <SavedConfigs onLoadConfig={onSettingsChange} />
+                                <button
+                                    onClick={handleSaveConfig}
+                                    className={`px-2.5 py-1.5 text-white rounded-lg whitespace-nowrap flex-shrink-0 transition-all duration-200
+                                             ${saveSuccess 
+                                                 ? 'bg-green-500 hover:bg-green-600' 
+                                                 : 'bg-blue-500 hover:bg-blue-600'}`}
+                                >
+                                    {saveSuccess ? 'Saved!' : 'Save Config'}
+                                </button>
+                            </div>
+                        </div>
+
                         {/* Server URL and API Key in a unified element */}
-                        <div className="p-3 bg-gray-800/50 rounded-lg space-y-2">
+                        <div className="p-3 bg-gray-800/50 rounded-lg space-y-2 relative z-10">
                             {/* Server URL */}
                             <div className="flex items-center">
                                 <label className="text-xs font-medium text-gray-200 w-24">
@@ -1019,8 +1037,8 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                                 </label>
                                 <div className="flex-1 relative">
                                     <input
-                                        type="text"
-                                        value={showApiKey ? (settings.apiKey || '') : getMaskedApiKey(settings.apiKey)}
+                                        type={showApiKey ? "text" : "password"}
+                                        value={settings.apiKey || ''}
                                         onChange={(e) => handleSettingsChange({
                                             apiKey: e.target.value
                                         })}
@@ -1256,23 +1274,20 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                                 </div>
                             </div>
                         </div>
-
-                        {/* Save configuration section */}
-                        <div className="mt-4 border-t border-gray-700 pt-4">
-                            <button
-                                onClick={handleSaveConfig}
-                                className="float-right px-3 py-1.5 bg-blue-500 hover:bg-blue-600 
-                                         text-white text-sm rounded-lg whitespace-nowrap"
-                            >
-                                Save Current Config
-                            </button>
-
-                            {/* SavedConfigs component */}
-                            <SavedConfigs onLoadConfig={onSettingsChange} />
+                    </div>
+                ) : activeTab === 'general' ? (
+                    <GeneralSettingsView />
+                ) : (
+                    // Applications View
+                    <div className="p-4 space-y-4">
+                        <div className="p-6 bg-gray-800/50 rounded-lg">
+                            <h3 className="text-lg font-medium text-gray-200 mb-3">Application Settings</h3>
+                            <p className="text-gray-400 text-sm">
+                                This section will contain configuration settings for different applications available within the website, 
+                                such as LangChain and Transformers.js. Stay tuned for upcoming features and integrations.
+                            </p>
                         </div>
                     </div>
-                ) : (
-                    <GeneralSettingsView />
                 )}
             </div>
         </div>
@@ -1281,8 +1296,8 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
 
 // Update the StatusRow component to be more compact
 const StatusRow: React.FC<{ label: keyof typeof STATUS_INFO; status: string }> = ({ label, status }) => (
-    <div className="flex items-center h-7 px-2 space-x-1.5 bg-gray-800 rounded-full text-gray-200">
-        <span className="text-[10px] font-medium">{STATUS_INFO[label].label}</span>
+    <div className="flex items-center h-7 px-2.5 space-x-0.5 bg-gray-800 rounded-full text-gray-200 shrink-0">
+        <span className="text-[10px] font-medium whitespace-nowrap">{STATUS_INFO[label].label}</span>
         <div className="flex items-center">
             <InfoIcon content={STATUS_INFO[label].description} />
         </div>
