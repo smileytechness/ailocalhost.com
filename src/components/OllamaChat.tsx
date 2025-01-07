@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import APISettingsPanel from './OllamaChat/APISettings';
 import { APISettings } from '../types/api';
 import { loadSavedConfigs, getLastUsedConfig, setLastUsedConfig } from '../utils/configStorage';
-import { FiChevronDown, FiX, FiFolder, FiTrash2, FiEdit, FiChevronLeft, FiChevronRight, FiMessageSquare, FiMoreHorizontal } from 'react-icons/fi';
+import { FiChevronDown, FiX, FiClock, FiTrash2, FiEdit, FiChevronLeft, FiChevronRight, FiMessageSquare, FiMoreHorizontal } from 'react-icons/fi';
 import { FiSettings } from 'react-icons/fi';
 import MessageBubble from './OllamaChat/MessageBubble';
 import StatusIndicator from './OllamaChat/StatusIndicator';
@@ -513,9 +513,9 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose }) => {
                                                     setIsHistoryDropdownOpen(!isHistoryDropdownOpen);
                                                 }}
                                                 className="flex items-center space-x-1 px-3.5 py-2 hover:bg-gray-700 rounded-l-full"
-                                                title="Files/Data"
+                                                title="Chat History"
                                             >
-                                                <FiFolder className="w-4.5 h-4.5" />
+                                                <FiClock className="w-4.5 h-4.5" />
                                             </button>
                                             <div className="w-px h-5 bg-gray-700" />
                                             <button
@@ -543,10 +543,10 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose }) => {
                                                                     setIsChatServicesOpen(false);
                                                                     setIsHistoryDropdownOpen(!isHistoryDropdownOpen);
                                                                 }}
-                                                                className="flex items-center space-x-1 px-3.5 py-2 hover:bg-gray-700"
-                                                                title="Files/Data"
+                                                                className="flex items-center space-x-1 px-3.5 py-2 hover:bg-gray-700 rounded-l-full"
+                                                                title="Chat History"
                                                             >
-                                                                <FiFolder className="w-4.5 h-4.5" />
+                                                                <FiClock className="w-4.5 h-4.5" />
                                                             </button>
                                                             <div className="w-px h-5 bg-gray-600" />
                                                             <button
@@ -554,7 +554,7 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose }) => {
                                                                     setIsHistoryDropdownOpen(false);
                                                                     setIsChatServicesOpen(!isChatServicesOpen);
                                                                 }}
-                                                                className="flex items-center space-x-1 px-3.5 py-2 hover:bg-gray-700"
+                                                                className="flex items-center space-x-1 px-3.5 py-2 hover:bg-gray-700 rounded-r-full"
                                                                 title="Chat Services"
                                                             >
                                                                 <FiMessageSquare className="w-4.5 h-4.5" />
