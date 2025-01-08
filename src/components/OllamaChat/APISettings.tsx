@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { APISettings, parameterDescriptions, serverStatusDescriptions } from '../../types/api';
 import { Tooltip } from '../ui/Tooltip';
-import { FiInfo, FiSidebar, FiRefreshCw, FiChevronDown, FiEye, FiEyeOff } from 'react-icons/fi';
+import { FiInfo, FiChevronDown, FiEye, FiEyeOff, FiArrowRight, FiRefreshCw } from 'react-icons/fi';
 import { SavedConfigs } from './SavedConfigs';
 import { loadSavedConfigs, saveConfig, setLastUsedConfig } from '../../utils/configStorage';
 import { useTheme } from '../../context/ThemeContext';
 import { getLocalStorageSize } from '../../utils/localStorage';
 import { getChatSessions, ChatSession } from '../../utils/chatStorage';
+import ApplicationsSettings from '../ApplicationsSettings';
 
 interface APISettingsPanelProps {
     settings: APISettings;
@@ -924,10 +925,10 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                         </div>
                         <button
                             onClick={() => onExpandedChange(false)}
-                            className="p-1.5 hover:bg-gray-800 rounded-full text-gray-200"
-                            title="Toggle API Settings"
+                            className="w-7 h-7 flex items-center justify-center bg-gray-800 hover:bg-gray-700 rounded-full text-gray-400 hover:text-gray-300 transition-colors"
+                            title="Close Settings"
                         >
-                            <FiSidebar className="w-4 h-4" />
+                            <FiArrowRight className="w-4 h-4" />
                         </button>
                     </div>
                 </div>
@@ -1280,13 +1281,13 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                 ) : (
                     // Applications View
                     <div className="p-4 space-y-4">
-                        <div className="p-6 bg-gray-800/50 rounded-lg">
-                            <h3 className="text-lg font-medium text-gray-200 mb-3">Application Settings</h3>
-                            <p className="text-gray-400 text-sm">
-                                This section will contain configuration settings for different applications available within the website, 
-                                such as LangChain and Transformers.js. Stay tuned for upcoming features and integrations.
-                            </p>
+                        <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                            <div className="font-medium text-yellow-200">Under Construction</div>
+                            <div className="mt-1 text-yellow-100/70 text-sm">
+                                The Applications section is currently being developed. Features and integrations listed here may not be fully functional yet.
+                            </div>
                         </div>
+                        <ApplicationsSettings />
                     </div>
                 )}
             </div>

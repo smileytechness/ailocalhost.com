@@ -431,19 +431,13 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose }) => {
         <div className="fixed inset-0 bg-gray-900 flex flex-col font-chat">
             <div className="flex-none border-b border-gray-700">
                 <div className="flex items-center justify-between p-4">
-                    <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-1">
                         <h1 className="text-xl font-semibold">Chat</h1>
                         <div className={`flex items-center space-x-2 px-3 py-1.5 text-sm 
                                      bg-gray-800 rounded-full hover:bg-gray-700
                                      cursor-pointer group`}
-                             onClick={(e) => {
-                                 if (!dropdownRef.current?.contains(e.target as Node)) {
-                                     setIsSettingsExpanded(!isSettingsExpanded);
-                                 }
-                             }}
+                             onClick={() => setIsConfigDropdownOpen(!isConfigDropdownOpen)}
                         >
-                              <FiSettings className="w-4 h-4" /> {/* Added settings icon here */}
-  
                             <div className="relative max-w-[140px] md:max-w-[200px]">
                                 <span className="block whitespace-nowrap overflow-hidden">
                                     {getDisplayUrl(apiSettings.serverUrl)}
@@ -451,335 +445,342 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose }) => {
                                 <div className="absolute inset-y-0 right-0 w-4 bg-gradient-to-r from-transparent to-gray-800 group-hover:to-gray-700 md:hidden" />
                             </div>
                             <StatusIndicator status={serverStatus} />
-                            <div className="relative" ref={dropdownRef}>
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setIsConfigDropdownOpen(!isConfigDropdownOpen);
-                                    }}
-                                    className="flex items-center space-x-1 p-1 hover:bg-gray-700 rounded-full"
-                                >
-                                    <FiChevronDown className="w-4 h-4" />
-                                </button>
-                                {isConfigDropdownOpen && (
-                                    <div style={{ right: 'max(16px, calc(100vw - 400px))' }}
-                                         className="fixed top-[60px] w-72 
-                                                  bg-gray-900 rounded-lg shadow-lg border border-gray-700 
-                                                  z-50 max-h-96 overflow-y-auto">
-                                        <div className="p-2">
-                                            <div className="text-sm font-medium text-gray-200 px-2 py-1 mb-1">
-                                                Saved Configurations
-                                            </div>
-                                            <div className="space-y-1">
-                                                {savedConfigs.map((config, index) => (
-                                                    <button
-                                                        key={index}
-                                                        onClick={() => {
-                                                            handleApiSettingsChange(config);
-                                                            setRunImmediateCheck(true);
-                                                            setIsConfigDropdownOpen(false);
-                                                        }}
-                                                        className="w-full text-left px-3 py-2 rounded 
-                                                                 bg-gray-800 hover:bg-gray-700 text-sm text-gray-200"
-                                                    >
-                                                        <div className="truncate">
-                                                            {config.serverUrl}
-                                                        </div>
-                                                        <div className="text-xs text-gray-400 truncate">
-                                                            {config.model || 'No model selected'}
-                                                        </div>
-                                                    </button>
-                                                ))}
-                                                {savedConfigs.length === 0 && (
-                                                    <div className="px-3 py-2 text-sm text-gray-400">
-                                                        Your saved API configurations will display here for quick toggle between servers.
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
+                            <FiChevronDown className="w-4 h-4" />
                         </div>
-                        <div className="flex items-center space-x-2">
-                            <div className="relative" ref={toolsRef}>
-                                <div className="flex items-center justify-end">
-                                    {/* Regular View */}
-                                    <div className={`flex items-center min-[394px]:flex hidden`}>
-                                        <div className="flex items-center bg-gray-800 rounded-full">
-                                            <button
-                                                onClick={() => {
-                                                    setIsChatServicesOpen(false);
-                                                    setIsHistoryDropdownOpen(!isHistoryDropdownOpen);
-                                                }}
-                                                className="flex items-center space-x-1 px-3.5 py-2 hover:bg-gray-700 rounded-l-full"
-                                                title="Chat History"
-                                            >
-                                                <FiClock className="w-4.5 h-4.5" />
-                                            </button>
-                                            <div className="w-px h-5 bg-gray-700" />
-                                            <button
-                                                onClick={() => {
-                                                    setIsHistoryDropdownOpen(false);
-                                                    setIsChatServicesOpen(!isChatServicesOpen);
-                                                }}
-                                                className="flex items-center space-x-1 px-3.5 py-2 hover:bg-gray-700 rounded-r-full"
-                                                title="Chat Services"
-                                            >
-                                                <FiMessageSquare className="w-4.5 h-4.5" />
-                                            </button>
+                        <div className="relative" ref={dropdownRef}>
+                            {isConfigDropdownOpen && (
+                                <div style={{ right: 'max(16px, calc(100vw - 400px))' }}
+                                     className="fixed top-[60px] w-72 
+                                              bg-gray-900 rounded-lg shadow-lg border border-gray-700 
+                                              z-50 max-h-96 overflow-y-auto">
+                                    <div className="p-2">
+                                        <div className="text-sm font-medium text-gray-200 px-2 py-1 mb-1">
+                                            Saved Configurations
                                         </div>
-                                    </div>
-
-                                    {/* Small Screen View */}
-                                    <div className="relative max-[393px]:block hidden">
-                                        <div className="flex items-center justify-end">
-                                            <div className="relative">
-                                                {isToolsExpanded && (
-                                                    <div className="absolute right-full">
-                                                        <div className="flex items-center bg-gray-800 border border-gray-600 rounded-l-full shadow-lg">
-                                                            <button
-                                                                onClick={() => {
-                                                                    setIsChatServicesOpen(false);
-                                                                    setIsHistoryDropdownOpen(!isHistoryDropdownOpen);
-                                                                }}
-                                                                className="flex items-center space-x-1 px-3.5 py-2 hover:bg-gray-700 rounded-l-full"
-                                                                title="Chat History"
-                                                            >
-                                                                <FiClock className="w-4.5 h-4.5" />
-                                                            </button>
-                                                            <div className="w-px h-5 bg-gray-600" />
-                                                            <button
-                                                                onClick={() => {
-                                                                    setIsHistoryDropdownOpen(false);
-                                                                    setIsChatServicesOpen(!isChatServicesOpen);
-                                                                }}
-                                                                className="flex items-center space-x-1 px-3.5 py-2 hover:bg-gray-700 rounded-r-full"
-                                                                title="Chat Services"
-                                                            >
-                                                                <FiMessageSquare className="w-4.5 h-4.5" />
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                )}
+                                        <div className="space-y-1">
+                                            {savedConfigs.map((config, index) => (
                                                 <button
-                                                    onClick={() => setIsToolsExpanded(!isToolsExpanded)}
-                                                    className={`flex items-center space-x-1 px-3.5 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-600 shadow-lg
-                                                              ${isToolsExpanded ? 'rounded-r-full border-l-0' : 'rounded-full'}`}
-                                                    title="Tools"
+                                                    key={index}
+                                                    onClick={() => {
+                                                        handleApiSettingsChange(config);
+                                                        setRunImmediateCheck(true);
+                                                        setIsConfigDropdownOpen(false);
+                                                    }}
+                                                    className="w-full text-left px-3 py-2 rounded 
+                                                             bg-gray-800 hover:bg-gray-700 text-sm text-gray-200"
                                                 >
-                                                    <FiMoreHorizontal className="w-4.5 h-4.5" />
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Dropdowns */}
-                                {isHistoryDropdownOpen && (
-                                    <div style={{ right: 'max(16px, calc(100vw - 400px))' }}
-                                         className="fixed top-[60px] w-72 
-                                                  bg-gray-900 rounded-lg shadow-lg border border-gray-700 
-                                                  z-[60] max-h-96 overflow-y-auto">
-                                        <div className="p-2">
-                                            <div className="flex border-b border-gray-700 mb-2">
-                                                <button
-                                                    onClick={() => setActiveTab('history')}
-                                                    className={`flex-1 px-3 py-2 text-sm font-medium rounded-t-lg
-                                                              ${activeTab === 'history' 
-                                                                ? 'text-blue-400 border-b-2 border-blue-400' 
-                                                                : 'text-gray-400 hover:text-gray-200'}`}
-                                                >
-                                                    Chat History
-                                                </button>
-                                                <button
-                                                    onClick={() => setActiveTab('snippets')}
-                                                    className={`flex-1 px-3 py-2 text-sm font-medium rounded-t-lg
-                                                              ${activeTab === 'snippets' 
-                                                                ? 'text-blue-400 border-b-2 border-blue-400' 
-                                                                : 'text-gray-400 hover:text-gray-200'}`}
-                                                >
-                                                    Code Snippets
-                                                </button>
-                                            </div>
-
-                                            {activeTab === 'history' ? (
-                                                <div className="px-2 space-y-1">
-                                                    <div className="flex items-center justify-between px-2 py-2 mb-2 border-b border-gray-700">
-                                                        <div className="flex items-center space-x-2">
-                                                            <span className="text-sm text-gray-400">
-                                                                {autoSave ? 'Auto-save enabled' : 'Auto-save disabled'}
-                                                            </span>
-                                                            <Switch
-                                                                checked={autoSave}
-                                                                onCheckedChange={handleAutoSaveChange}
-                                                                className="data-[state=checked]:bg-blue-500"
-                                                            />
-                                                        </div>
+                                                    <div className="truncate">
+                                                        {config.serverUrl}
                                                     </div>
-                                                    {chatSessions.length > 0 ? (
-                                                        <>
-                                                            {chatSessions
-                                                                .sort((a, b) => b.lastTimestamp.getTime() - a.lastTimestamp.getTime())
-                                                                .map((session) => (
-                                                                <div key={session.id} className="group relative rounded bg-gray-800 hover:bg-gray-700 transition-colors">
-                                                                    <div 
-                                                                        className="w-full text-left p-2 cursor-pointer"
-                                                                        onClick={() => handleLoadSession(session.id)}
-                                                                    >
-                                                                        <div className="flex items-center justify-between">
-                                                                            <div className="flex-1 min-w-0">
-                                                                                <div className="text-sm text-gray-200 font-medium truncate">
-                                                                                    {session.name}
-                                                                                </div>
-                                                                                <div className="flex items-center text-xs text-gray-400 space-x-2">
-                                                                                    <span>{session.lastTimestamp.toLocaleDateString()} {session.lastTimestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                                                                    <span className="opacity-50">•</span>
-                                                                                    <span className="font-mono opacity-50">{session.wordCount} words</span>
-                                                                                </div>
-                                                                            </div>
-                                                                            <button 
-                                                                                onClick={(e) => {
-                                                                                    e.stopPropagation();
-                                                                                    deleteChatSession(session.id);
-                                                                                }}
-                                                                                className="p-1.5 text-gray-500 hover:text-red-400 
-                                                                                         hover:bg-red-400/10 rounded transition-all"
-                                                                                title="Delete chat"
-                                                                            >
-                                                                                <FiTrash2 className="w-4 h-4" />
-                                                                            </button>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            ))}
-                                                            <div className="mt-4 px-2">
-                                                                <button
-                                                                    onClick={() => setShowClearAllConfirm(true)}
-                                                                    className="w-full px-3 py-2 text-sm text-red-400 hover:text-red-300 
-                                                                             bg-red-400/10 hover:bg-red-400/20 
-                                                                             rounded transition-colors"
-                                                                >
-                                                                    Clear All Chat History
-                                                                </button>
-                                                            </div>
-                                                            
-                                                            {showClearAllConfirm && (
-                                                                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                                                                    <div className="bg-gray-900 p-6 rounded-lg shadow-xl border border-gray-700 max-w-sm w-full mx-4">
-                                                                        <h3 className="text-lg font-medium mb-4">Clear All Chat History?</h3>
-                                                                        <p className="text-sm text-gray-400 mb-6">
-                                                                            Are you sure you want to delete all your chat history? This action cannot be undone.
-                                                                        </p>
-                                                                        <div className="flex justify-end space-x-3">
-                                                                            <button
-                                                                                onClick={() => setShowClearAllConfirm(false)}
-                                                                                className="px-4 py-2 text-sm bg-gray-800 hover:bg-gray-700 rounded"
-                                                                            >
-                                                                                Cancel
-                                                                            </button>
-                                                                            <button
-                                                                                onClick={() => {
-                                                                                    clearAllChatSessions();
-                                                                                    setShowClearAllConfirm(false);
-                                                                                }}
-                                                                                className="px-4 py-2 text-sm bg-red-500/20 hover:bg-red-500/30 
-                                                                                         text-red-400 hover:text-red-300 rounded"
-                                                                            >
-                                                                                Yes, Delete All
-                                                                            </button>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            )}
-                                                        </>
-                                                    ) : (
-                                                        <div className="px-3 py-2 text-sm text-gray-400">
-                                                            No saved chat sessions yet.
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            ) : (
-                                                <div className="px-2 space-y-1">
-                                                    <div className="group relative rounded bg-gray-800 hover:bg-gray-700 transition-colors">
-                                                        <div 
-                                                            className="w-full text-left p-2 cursor-pointer"
-                                                            onClick={() => {
-                                                                console.log('Snippet selected');
-                                                            }}
-                                                        >
-                                                            <div className="flex items-center justify-between">
-                                                                <div className="flex-1 min-w-0">
-                                                                    <div className="text-sm text-gray-200 font-medium truncate">
-                                                                        Example Code Snippet
-                                                                    </div>
-                                                                    <div className="flex items-center text-xs text-gray-400 space-x-2">
-                                                                        <span>JavaScript</span>
-                                                                        <span className="opacity-50">•</span>
-                                                                        <span>50 lines</span>
-                                                                    </div>
-                                                                </div>
-                                                                <button 
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        console.log('Delete clicked');
-                                                                    }}
-                                                                    className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-600 rounded transition-opacity"
-                                                                    title="Delete snippet"
-                                                                >
-                                                                    <FiTrash2 className="w-4 h-4 text-gray-400 hover:text-gray-200" />
-                                                                </button>
-                                                            </div>
-                                                        </div>
+                                                    <div className="text-xs text-gray-400 truncate">
+                                                        {config.model || 'No model selected'}
                                                     </div>
-                                                    <div className="mt-2 p-2 text-xs bg-yellow-500/10 border border-yellow-500/20 rounded">
-                                                        <div className="font-medium text-yellow-200">Under Construction</div>
-                                                        <div className="mt-1 text-yellow-100/70">
-                                                            Code snippets functionality is currently being implemented. You'll be able to save, view, and manage your code snippets here.
-                                                        </div>
-                                                    </div>
+                                                </button>
+                                            ))}
+                                            {savedConfigs.length === 0 && (
+                                                <div className="px-3 py-2 text-sm text-gray-400">
+                                                    Your saved API configurations will display here for quick toggle between servers.
                                                 </div>
                                             )}
                                         </div>
                                     </div>
-                                )}
-                                
-                                {isChatServicesOpen && (
-                                    <div style={{ right: 'max(16px, calc(100vw - 400px))' }}
-                                         className="fixed top-[60px] w-72 
-                                                  bg-gray-900 rounded-lg shadow-lg border border-gray-700 
-                                                  z-[60] max-h-96 overflow-y-auto">
-                                        <div className="p-2">
-                                            <div className="text-sm font-medium text-gray-200 px-2 py-1 mb-1">
-                                                Chat Services
-                                            </div>
-                                            <div className="space-y-2">
-                                                <div className="p-2 rounded bg-gray-800 hover:bg-gray-750">
-                                                    <div className="flex items-center justify-between">
-                                                        <div>
-                                                            <div className="text-sm text-gray-200">Send Chat Context</div>
-                                                            <div className="text-xs text-gray-400">
-                                                                Append the chat history to each message sent in order to provide the context for the LLM.
-                                                            </div>
-                                                        </div>
+                                </div>
+                            )}
+                        </div>
+                        
+                        <div className="relative" ref={toolsRef}>
+                            <div className="flex items-center justify-end">
+                                {/* Regular View */}
+                                <div className={`flex items-center min-[394px]:flex hidden`}>
+                                    <div className="flex items-center bg-gray-800 rounded-full">
+                                        <button
+                                            onClick={() => setIsSettingsExpanded(!isSettingsExpanded)}
+                                            className="flex items-center space-x-1 px-3.5 py-2 hover:bg-gray-700 rounded-l-full"
+                                            title="Settings"
+                                        >
+                                            <FiSettings className="w-4.5 h-4.5" />
+                                        </button>
+                                        <div className="w-px h-5 bg-gray-700" />
+                                        <button
+                                            onClick={() => {
+                                                setIsChatServicesOpen(false);
+                                                setIsHistoryDropdownOpen(!isHistoryDropdownOpen);
+                                            }}
+                                            className="flex items-center space-x-1 px-3.5 py-2 hover:bg-gray-700"
+                                            title="Chat History"
+                                        >
+                                            <FiClock className="w-4.5 h-4.5" />
+                                        </button>
+                                        <div className="w-px h-5 bg-gray-700" />
+                                        <button
+                                            onClick={() => {
+                                                setIsHistoryDropdownOpen(false);
+                                                setIsChatServicesOpen(!isChatServicesOpen);
+                                            }}
+                                            className="flex items-center space-x-1 px-3.5 py-2 hover:bg-gray-700 rounded-r-full"
+                                            title="Chat Services"
+                                        >
+                                            <FiMessageSquare className="w-4.5 h-4.5" />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Small Screen View */}
+                                <div className="relative max-[393px]:block hidden">
+                                    <div className="flex items-center justify-end">
+                                        <div className="relative">
+                                            {isToolsExpanded && (
+                                                <div className="absolute right-full">
+                                                    <div className="flex items-center bg-gray-800 border border-gray-600 rounded-l-full shadow-lg">
+                                                        <button
+                                                            onClick={() => setIsSettingsExpanded(!isSettingsExpanded)}
+                                                            className="flex items-center space-x-1 px-3.5 py-2 hover:bg-gray-700 rounded-l-full"
+                                                            title="Settings"
+                                                        >
+                                                            <FiSettings className="w-4.5 h-4.5" />
+                                                        </button>
+                                                        <div className="w-px h-5 bg-gray-600" />
+                                                        <button
+                                                            onClick={() => {
+                                                                setIsChatServicesOpen(false);
+                                                                setIsHistoryDropdownOpen(!isHistoryDropdownOpen);
+                                                            }}
+                                                            className="flex items-center space-x-1 px-3.5 py-2 hover:bg-gray-700"
+                                                            title="Chat History"
+                                                        >
+                                                            <FiClock className="w-4.5 h-4.5" />
+                                                        </button>
+                                                        <div className="w-px h-5 bg-gray-600" />
+                                                        <button
+                                                            onClick={() => {
+                                                                setIsHistoryDropdownOpen(false);
+                                                                setIsChatServicesOpen(!isChatServicesOpen);
+                                                            }}
+                                                            className="flex items-center space-x-1 px-3.5 py-2 hover:bg-gray-700 rounded-r-full"
+                                                            title="Chat Services"
+                                                        >
+                                                            <FiMessageSquare className="w-4.5 h-4.5" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                            <button
+                                                onClick={() => setIsToolsExpanded(!isToolsExpanded)}
+                                                className={`flex items-center space-x-1 px-3.5 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-600 shadow-lg
+                                                          ${isToolsExpanded ? 'rounded-r-full border-l-0' : 'rounded-full'}`}
+                                                title="Tools"
+                                            >
+                                                <FiMoreHorizontal className="w-4.5 h-4.5" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Dropdowns */}
+                            {isHistoryDropdownOpen && (
+                                <div style={{ right: 'max(16px, calc(100vw - 400px))' }}
+                                     className="fixed top-[60px] w-72 
+                                              bg-gray-900 rounded-lg shadow-lg border border-gray-700 
+                                              z-[60] max-h-96 overflow-y-auto">
+                                    <div className="p-2">
+                                        <div className="flex border-b border-gray-700 mb-2">
+                                            <button
+                                                onClick={() => setActiveTab('history')}
+                                                className={`flex-1 px-3 py-2 text-sm font-medium rounded-t-lg
+                                                          ${activeTab === 'history' 
+                                                            ? 'text-blue-400 border-b-2 border-blue-400' 
+                                                            : 'text-gray-400 hover:text-gray-200'}`}
+                                            >
+                                                Chat History
+                                            </button>
+                                            <button
+                                                onClick={() => setActiveTab('snippets')}
+                                                className={`flex-1 px-3 py-2 text-sm font-medium rounded-t-lg
+                                                          ${activeTab === 'snippets' 
+                                                            ? 'text-blue-400 border-b-2 border-blue-400' 
+                                                            : 'text-gray-400 hover:text-gray-200'}`}
+                                            >
+                                                Code Snippets
+                                            </button>
+                                        </div>
+
+                                        {activeTab === 'history' ? (
+                                            <div className="px-2 space-y-1">
+                                                <div className="flex items-center justify-between px-2 py-2 mb-2 border-b border-gray-700">
+                                                    <div className="flex items-center space-x-2">
+                                                        <span className="text-sm text-gray-400">
+                                                            {autoSave ? 'Auto-save enabled' : 'Auto-save disabled'}
+                                                        </span>
                                                         <Switch
-                                                            checked={sendChatContext}
-                                                            onCheckedChange={setSendChatContext}
+                                                            checked={autoSave}
+                                                            onCheckedChange={handleAutoSaveChange}
                                                             className="data-[state=checked]:bg-blue-500"
                                                         />
+                                                    </div>
+                                                </div>
+                                                {chatSessions.length > 0 ? (
+                                                    <>
+                                                        {chatSessions
+                                                            .sort((a, b) => b.lastTimestamp.getTime() - a.lastTimestamp.getTime())
+                                                            .map((session) => (
+                                                            <div key={session.id} className="group relative rounded bg-gray-800 hover:bg-gray-700 transition-colors">
+                                                                <div 
+                                                                    className="w-full text-left p-2 cursor-pointer"
+                                                                    onClick={() => handleLoadSession(session.id)}
+                                                                >
+                                                                    <div className="flex items-center justify-between">
+                                                                        <div className="flex-1 min-w-0">
+                                                                            <div className="text-sm text-gray-200 font-medium truncate">
+                                                                                {session.name}
+                                                                            </div>
+                                                                            <div className="flex items-center text-xs text-gray-400 space-x-2">
+                                                                                <span>{session.lastTimestamp.toLocaleDateString()} {session.lastTimestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                                                <span className="opacity-50">•</span>
+                                                                                <span className="font-mono opacity-50">{session.wordCount} words</span>
+                                                                            </div>
+                                                                        </div>
+                                                                        <button 
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                deleteChatSession(session.id);
+                                                                            }}
+                                                                            className="p-1.5 text-gray-500 hover:text-red-400 
+                                                                                     hover:bg-red-400/10 rounded transition-all"
+                                                                            title="Delete chat"
+                                                                        >
+                                                                            <FiTrash2 className="w-4 h-4" />
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                        <div className="mt-4 px-2">
+                                                            <button
+                                                                onClick={() => setShowClearAllConfirm(true)}
+                                                                className="w-full px-3 py-2 text-sm text-red-400 hover:text-red-300 
+                                                                         bg-red-400/10 hover:bg-red-400/20 
+                                                                         rounded transition-colors"
+                                                            >
+                                                                Clear All Chat History
+                                                            </button>
+                                                        </div>
+                                                        
+                                                        {showClearAllConfirm && (
+                                                            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                                                                <div className="bg-gray-900 p-6 rounded-lg shadow-xl border border-gray-700 max-w-sm w-full mx-4">
+                                                                    <h3 className="text-lg font-medium mb-4">Clear All Chat History?</h3>
+                                                                    <p className="text-sm text-gray-400 mb-6">
+                                                                        Are you sure you want to delete all your chat history? This action cannot be undone.
+                                                                    </p>
+                                                                    <div className="flex justify-end space-x-3">
+                                                                        <button
+                                                                            onClick={() => setShowClearAllConfirm(false)}
+                                                                            className="px-4 py-2 text-sm bg-gray-800 hover:bg-gray-700 rounded"
+                                                                        >
+                                                                            Cancel
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                clearAllChatSessions();
+                                                                                setShowClearAllConfirm(false);
+                                                                            }}
+                                                                            className="px-4 py-2 text-sm bg-red-500/20 hover:bg-red-500/30 
+                                                                                     text-red-400 hover:text-red-300 rounded"
+                                                                        >
+                                                                            Yes, Delete All
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </>
+                                                ) : (
+                                                    <div className="px-3 py-2 text-sm text-gray-400">
+                                                        No saved chat sessions yet.
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <div className="px-2 space-y-1">
+                                                <div className="group relative rounded bg-gray-800 hover:bg-gray-700 transition-colors">
+                                                    <div 
+                                                        className="w-full text-left p-2 cursor-pointer"
+                                                        onClick={() => {
+                                                            console.log('Snippet selected');
+                                                        }}
+                                                    >
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="text-sm text-gray-200 font-medium truncate">
+                                                                    Example Code Snippet
+                                                                </div>
+                                                                <div className="flex items-center text-xs text-gray-400 space-x-2">
+                                                                    <span>JavaScript</span>
+                                                                    <span className="opacity-50">•</span>
+                                                                    <span>50 lines</span>
+                                                                </div>
+                                                            </div>
+                                                            <button 
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    console.log('Delete clicked');
+                                                                }}
+                                                                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-600 rounded transition-opacity"
+                                                                title="Delete snippet"
+                                                            >
+                                                                <FiTrash2 className="w-4 h-4 text-gray-400 hover:text-gray-200" />
+                                                            </button>
+                                                        </div>
                                                     </div>
                                                 </div>
                                                 <div className="mt-2 p-2 text-xs bg-yellow-500/10 border border-yellow-500/20 rounded">
                                                     <div className="font-medium text-yellow-200">Under Construction</div>
                                                     <div className="mt-1 text-yellow-100/70">
-                                                        Additional chat services configuration including LangChain integration, chat modes, and other AI service settings will be available here soon.
+                                                        Code snippets functionality is currently being implemented. You'll be able to save, view, and manage your code snippets here.
                                                     </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                            
+                            {isChatServicesOpen && (
+                                <div style={{ right: 'max(16px, calc(100vw - 400px))' }}
+                                     className="fixed top-[60px] w-72 
+                                              bg-gray-900 rounded-lg shadow-lg border border-gray-700 
+                                              z-[60] max-h-96 overflow-y-auto">
+                                    <div className="p-2">
+                                        <div className="text-sm font-medium text-gray-200 px-2 py-1 mb-1">
+                                            Chat Services
+                                        </div>
+                                        <div className="space-y-2">
+                                            <div className="p-2 rounded bg-gray-800 hover:bg-gray-750">
+                                                <div className="flex items-center justify-between">
+                                                    <div>
+                                                        <div className="text-sm text-gray-200">Send Chat Context</div>
+                                                        <div className="text-xs text-gray-400">
+                                                            Append the chat history to each message sent in order to provide the context for the LLM.
+                                                        </div>
+                                                    </div>
+                                                    <Switch
+                                                        checked={sendChatContext}
+                                                        onCheckedChange={setSendChatContext}
+                                                        className="data-[state=checked]:bg-blue-500"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="mt-2 p-2 text-xs bg-yellow-500/10 border border-yellow-500/20 rounded">
+                                                <div className="font-medium text-yellow-200">Under Construction</div>
+                                                <div className="mt-1 text-yellow-100/70">
+                                                    Additional chat services configuration including LangChain integration, chat modes, and other AI service settings will be available here soon.
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
-                                )}
-                            </div>
+                                </div>
+                            )}
                         </div>
                     </div>
 
