@@ -132,19 +132,19 @@ export const Console: React.FC<ConsoleProps> = ({ onClose }) => {
     };
 
     return (
-        <div className="h-full flex flex-col bg-gray-900 text-gray-100 font-mono">
-            <div className="border-b border-gray-700 p-2 flex justify-between items-center">
+        <div className="h-full flex flex-col bg-gray-950 text-gray-100 font-mono">
+            <div className="border-b border-gray-700 p-2 flex justify-between items-center bg-gray-800">
                 <h2 className="text-sm font-semibold text-gray-300">JavaScript Console</h2>
                 <div className="flex space-x-2">
                     <button
                         onClick={() => customConsole.clear()}
-                        className="px-2 py-1 text-xs bg-gray-800 hover:bg-gray-700 rounded"
+                        className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
                     >
                         Clear
                     </button>
                     <button
                         onClick={onClose}
-                        className="px-2 py-1 text-xs bg-gray-800 hover:bg-gray-700 rounded"
+                        className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
                     >
                         Close
                     </button>

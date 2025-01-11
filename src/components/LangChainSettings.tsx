@@ -38,7 +38,7 @@ const LangChainSettings: React.FC<LangChainSettingsProps> = ({
             <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
                 <div className="flex items-center gap-3">
                     {logo && (
-                        <div className="w-16 h-16 rounded-lg bg-gray-900/50 p-2 flex items-center justify-center">
+                        <div className="w-16 h-16 bg-gray-900/50 rounded-lg flex items-center justify-center shrink-0 relative overflow-hidden">
                             <img
                                 src={logo.src}
                                 alt={logo.alt}
@@ -48,7 +48,7 @@ const LangChainSettings: React.FC<LangChainSettingsProps> = ({
                     )}
                     <div>
                         <h3 className="text-base font-medium text-gray-200">LangChain</h3>
-                        <p className="text-sm text-gray-400">JavaScript LangChain integration</p>
+                        <p className="text-sm text-gray-400">JavaScript LangChain integration for RAG, Agents, and more.</p>
                     </div>
                 </div>
                 <button

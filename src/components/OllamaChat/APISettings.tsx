@@ -337,17 +337,35 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
     };
 
     // Function to calculate storage breakdown
-    const getStorageBreakdown = () => {
+    const getStorageBreakdown = async () => {
         const total = getLocalStorageSize();
         const savedConfigs = localStorage.getItem('ollama_saved_configs')?.length || 0;
         const chatHistory = localStorage.getItem('chat_sessions')?.length || 0;
+
+        // Calculate transformers cache size
+        let transformersCacheSize = 0;
+        try {
+            const cache = await caches.open('transformers-cache');
+            const keys = await cache.keys();
+            for (const request of keys) {
+                const response = await cache.match(request);
+                if (response) {
+                    const blob = await response.blob();
+                    transformersCacheSize += blob.size;
+                }
+            }
+        } catch (error) {
+            console.error('Error calculating transformers cache size:', error);
+        }
+
         const other = total - (savedConfigs + chatHistory);
 
         return {
             savedConfigs: (savedConfigs * 2), // multiply by 2 for UTF-16 encoding
             chatHistory: (chatHistory * 2),
+            installedModels: transformersCacheSize,
             other: Math.max(0, other),
-            total
+            total: total + transformersCacheSize // Add cache size to total
         };
     };
 
@@ -368,8 +386,23 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
     );
 
     const GeneralSettingsView = () => {
-        const storage = getStorageBreakdown();
-        
+        const [storage, setStorage] = useState({
+            savedConfigs: 0,
+            chatHistory: 0,
+            installedModels: 0,
+            other: 0,
+            total: 0
+        });
+
+        // Update storage info when component mounts
+        useEffect(() => {
+            const updateStorage = async () => {
+                const breakdown = await getStorageBreakdown();
+                setStorage(breakdown);
+            };
+            updateStorage();
+        }, []);
+
         return (
             <div className="p-4 space-y-6">
                 {/* Profile Tools */}
@@ -422,13 +455,25 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                             <span className="text-gray-300">{(storage.chatHistory / 1024).toFixed(2)} KB</span>
                         </div>
                         <div className="flex justify-between text-sm">
+                            <span className="text-gray-400">Installed Models</span>
+                            <span className="text-gray-300">
+                                {storage.installedModels > 1024 * 1024 
+                                    ? `${(storage.installedModels / (1024 * 1024)).toFixed(2)} MB`
+                                    : `${(storage.installedModels / 1024).toFixed(2)} KB`}
+                            </span>
+                        </div>
+                        <div className="flex justify-between text-sm">
                             <span className="text-gray-400">Other</span>
                             <span className="text-gray-300">{(storage.other / 1024).toFixed(2)} KB</span>
                         </div>
                         <div className="h-px bg-gray-700 my-2" />
                         <div className="flex justify-between text-sm font-medium">
                             <span className="text-gray-200">Total</span>
-                            <span className="text-gray-200">{(storage.total / 1024).toFixed(2)} KB</span>
+                            <span className="text-gray-200">
+                                {storage.total > 1024 * 1024 
+                                    ? `${(storage.total / (1024 * 1024)).toFixed(2)} MB`
+                                    : `${(storage.total / 1024).toFixed(2)} KB`}
+                            </span>
                         </div>
                     </div>
                 </div>
@@ -900,7 +945,7 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
     };
 
     return (
-        <div className="h-full flex flex-col bg-gray-900 api-settings-panel min-w-[360px] max-w-[383px] w-full min-[375px]:w-[375px] md:w-auto md:max-w-none md:min-w-0">
+        <div className="h-full flex flex-col bg-gray-900 api-settings-panel min-w-[360px] max-w-[383px] w-full min-[375px]:w-[375px] md:w-auto md:max-w-none md:min-w-0 overflow-hidden">
             {/* Header with tabs */}
             <div className="flex-none p-3 border-b border-gray-700">
                 <div className="flex flex-col space-y-3">
@@ -935,7 +980,7 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
             </div>
 
             {/* Content area */}
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto min-h-0">
                 {activeTab === 'api' ? (
                     // Original API Settings content
                     <div className="p-4 space-y-4">
@@ -1281,12 +1326,6 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                 ) : (
                     // Applications View
                     <div className="p-4 space-y-4">
-                        <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-                            <div className="font-medium text-yellow-200">Under Construction</div>
-                            <div className="mt-1 text-yellow-100/70 text-sm">
-                                The Applications section is currently being developed. Features and integrations listed here may not be fully functional yet.
-                            </div>
-                        </div>
                         <ApplicationsSettings />
                     </div>
                 )}
