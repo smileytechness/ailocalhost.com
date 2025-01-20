@@ -2,12 +2,15 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import APISettingsPanel from './OllamaChat/APISettings';
 import { APISettings } from '../types/api';
 import { loadSavedConfigs, getLastUsedConfig, setLastUsedConfig } from '../utils/configStorage';
-import { FiChevronDown, FiX, FiClock, FiTrash2, FiEdit, FiChevronLeft, FiChevronRight, FiMessageSquare, FiMoreHorizontal } from 'react-icons/fi';
+import { FiChevronDown, FiX, FiClock, FiTrash2, FiEdit, FiChevronLeft, FiChevronRight, FiMessageSquare, FiMoreHorizontal, FiSend } from 'react-icons/fi';
 import { FiSettings } from 'react-icons/fi';
 import MessageBubble from './OllamaChat/MessageBubble';
 import StatusIndicator from './OllamaChat/StatusIndicator';
 import { ChatMessage, ChatSession, createNewSession, updateSession, getChatSessions, deleteChatSession, loadSession, clearAllChatSessions, getAutoSavePreference, setAutoSavePreference } from '../utils/chatStorage';
 import { Switch } from '../components/ui/Switch';
+import EnhancedInput from './OllamaChat/EnhancedInput';
+import ImportedFiles from './OllamaChat/ImportedFiles';
+import { ImportedFile } from '../utils/fileStorage';
 
 interface OllamaChatProps {
     onClose: () => void;
@@ -29,9 +32,9 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose }) => {
             serverUrl: 'http://localhost:11434/v1/chat/completions',
             model: 'llama3.2',
             apiKey: '',
-            temperature: 0.2,
-            maxTokens: 500,
-            topP: 0.5,
+            temperature: 1.2,
+            maxTokens: 8000,
+            topP: 1.0,
             frequencyPenalty: 0,
             presencePenalty: 0
         };
@@ -316,11 +319,6 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose }) => {
         ))
     ), [messages]);
 
-    // Debounce input changes to prevent excessive re-renders
-    const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-        setInput(e.target.value);
-    }, []);
-
     // Optimize message container scroll handling
     const handleScroll = useCallback(() => {
         if (!messagesContainerRef.current) return;
@@ -425,6 +423,11 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose }) => {
         
         setShowSavePrompt(false);
         setPendingAction(null);
+    };
+
+    const handleAppendFileToChat = (file: ImportedFile) => {
+        const fileInfo = `[File: ${file.name}]`;
+        setInput(prev => prev + (prev ? ' ' : '') + fileInfo);
     };
 
     return (
@@ -601,7 +604,7 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose }) => {
                                                             ? 'text-blue-400 border-b-2 border-blue-400' 
                                                             : 'text-gray-400 hover:text-gray-200'}`}
                                             >
-                                                Code Snippets
+                                                Imported Files
                                             </button>
                                         </div>
 
@@ -703,43 +706,7 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose }) => {
                                             </div>
                                         ) : (
                                             <div className="px-2 space-y-1">
-                                                <div className="group relative rounded bg-gray-800 hover:bg-gray-700 transition-colors">
-                                                    <div 
-                                                        className="w-full text-left p-2 cursor-pointer"
-                                                        onClick={() => {
-                                                            console.log('Snippet selected');
-                                                        }}
-                                                    >
-                                                        <div className="flex items-center justify-between">
-                                                            <div className="flex-1 min-w-0">
-                                                                <div className="text-sm text-gray-200 font-medium truncate">
-                                                                    Example Code Snippet
-                                                                </div>
-                                                                <div className="flex items-center text-xs text-gray-400 space-x-2">
-                                                                    <span>JavaScript</span>
-                                                                    <span className="opacity-50">•</span>
-                                                                    <span>50 lines</span>
-                                                                </div>
-                                                            </div>
-                                                            <button 
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    console.log('Delete clicked');
-                                                                }}
-                                                                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-600 rounded transition-opacity"
-                                                                title="Delete snippet"
-                                                            >
-                                                                <FiTrash2 className="w-4 h-4 text-gray-400 hover:text-gray-200" />
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div className="mt-2 p-2 text-xs bg-yellow-500/10 border border-yellow-500/20 rounded">
-                                                    <div className="font-medium text-yellow-200">Under Construction</div>
-                                                    <div className="mt-1 text-yellow-100/70">
-                                                        Code snippets functionality is currently being implemented. You'll be able to save, view, and manage your code snippets here.
-                                                    </div>
-                                                </div>
+                                                <ImportedFiles onAppendToChat={handleAppendFileToChat} />
                                             </div>
                                         )}
                                     </div>
@@ -947,54 +914,43 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose }) => {
                         </div>
                     </div>
 
-                    <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-gray-900 via-gray-900 to-transparent pb-6">
+                    <div className="fixed bottom-0 left-0 right-0 p-4">
                         <div className={`max-w-3xl mx-auto ${isSettingsExpanded ? 'md:mr-96' : ''}`}>
                             {messages.length > 0 && (
                                 <div className="flex justify-end mb-2">
                                     <button
                                         onClick={handleNewChat}
                                         className="flex items-center space-x-2 px-4 py-2 text-sm 
-                                                 bg-gray-800/80 hover:bg-gray-700/90 
+                                                 bg-gray-900/90 hover:bg-gray-800/90 
                                                  border border-gray-700/50 hover:border-gray-600
                                                  rounded-full shadow-lg backdrop-blur-sm
                                                  transition-all duration-200"
                                         title="Start new chat"
                                     >
                                         <FiEdit className="w-4 h-4" />
-                                        <span>New Chat</span>
                                     </button>
                                 </div>
                             )}
                             <div className="flex items-center space-x-2">
-                                <textarea
-                                    ref={textareaRef}
-                                    value={input}
-                                    onChange={handleInputChange}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter' && !e.shiftKey) {
-                                            e.preventDefault();
-                                            handleSendMessage();
-                                        }
-                                    }}
-                                    placeholder="Type a message..."
-                                    rows={1}
-                                    style={{
-                                        minHeight: '36px',
-                                        maxHeight: '200px',
-                                        height: 'auto',
-                                        resize: 'none'
-                                    }}
-                                    className="flex-1 p-2 text-sm bg-gray-800 border border-gray-700 
-                                             rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent
-                                             overscroll-y-contain"
-                                />
-                                <button
-                                    onClick={handleSendMessage}
-                                    className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 
-                                             text-white text-sm rounded-lg whitespace-nowrap"
-                                >
-                                    Send
-                                </button>
+                                <div className="flex-1 flex items-center bg-gray-900/90 rounded-lg border border-gray-700">
+                                    <EnhancedInput
+                                        value={input}
+                                        onChange={setInput}
+                                        onSend={handleSendMessage}
+                                        className="flex-1 border-none bg-transparent focus:ring-0"
+                                    />
+                                    <div className="flex items-center pr-1.5">
+                                        <div className="h-5 w-px bg-gray-700/50"></div>
+                                        <button
+                                            onClick={handleSendMessage}
+                                            className="ml-2 w-7 h-7 flex items-center justify-center text-gray-400 
+                                                     bg-blue-500/10 hover:bg-blue-500/20 hover:text-blue-400 
+                                                     rounded-full transition-all"
+                                        >
+                                            <FiSend className="w-3.5 h-3.5" />
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>

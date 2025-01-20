@@ -54,13 +54,14 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartChat }) => {
             <section className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 text-center pt-16">
                 <div className="container mx-auto px-6">
                     <h1 className="text-4xl md:text-6xl font-extrabold mb-4">
-                     One Chat. Any AI.
+                     One Interface. Any AI.
                     </h1>
                     <p className="text-xl md:text-2xl text-gray-300 mb-8 max-w-4xl mx-auto">
-                    A single chat UI for every AI server. Prioritizing local-first privacy for AI enthusiasts.
+                    A single interface for every AI server. Prioritizing local-first privacy for AI enthusiasts.
                     </p>
                     <div className="text-gray-400 mb-12 flex flex-wrap justify-center gap-2 text-sm max-w-4xl mx-auto">
-                        <span className="text-gray-300">Works with:</span>&nbsp;
+                        
+                        <span className="font-bold">Transformers.js in-browser</span> •
                         <span className="font-bold">Ollama</span> •
                         <span className="font-bold">LM Studio</span> •
                         <span className="font-bold">Jan.ai</span> •
@@ -111,8 +112,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartChat }) => {
                             description="Save and switch between different API configurations for quick access to your preferred servers."
                         />
                         <FeatureCard
-                            title="Easy Connection"
-                            description="Simple status checks and clear resolution steps for HTTP, LAN, and CORS issues."
+                            title="Transformers.js in-browser"
+                            description="Use transformers.js in-browser for locally run, low-latency inference of LLM models. Download models from Hugging Face or import your files."
                         />
                         <FeatureCard
                             title="Local Storage"

@@ -42,7 +42,7 @@ const LangChainSettings: React.FC<LangChainSettingsProps> = ({
                             <img
                                 src={logo.src}
                                 alt={logo.alt}
-                                className={`${logo.className} [filter:brightness(0)_invert(1)]`}
+                                className={`${logo.className} w-12 h-12 object-contain relative z-10 [filter:brightness(0)_invert(1)]`}
                             />
                         </div>
                     )}

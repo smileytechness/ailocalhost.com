@@ -43,7 +43,7 @@ const OllamaSettings: React.FC<OllamaSettingsProps> = ({
                             <img
                                 src={logo.src}
                                 alt={logo.alt}
-                                className="w-10 h-10 object-contain relative z-10"
+                                className="w-12 h-12 object-contain relative z-10"
                             />
                         </div>
                     )}

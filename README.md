@@ -1,7 +1,9 @@
 
 <img width="904" alt="Screenshot 2025-01-06 at 9 11 52 PM" src="https://github.com/user-attachments/assets/8e1055e8-8de0-4627-946a-7a7d9f22f9f3" />
 
-
+#####
+UI/UX Updates in progress. Please note, they do not all work, or are not all connected to a function. 
+#####
 
 
 # React + TypeScript + Vite

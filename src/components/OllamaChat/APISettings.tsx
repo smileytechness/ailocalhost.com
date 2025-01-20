@@ -7,6 +7,7 @@ import { loadSavedConfigs, saveConfig, setLastUsedConfig } from '../../utils/con
 import { useTheme } from '../../context/ThemeContext';
 import { getLocalStorageSize } from '../../utils/localStorage';
 import { getChatSessions, ChatSession } from '../../utils/chatStorage';
+import { getImportedFilesSize } from '../../utils/fileStorage';
 import ApplicationsSettings from '../ApplicationsSettings';
 
 interface APISettingsPanelProps {
@@ -336,9 +337,21 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
         setTimeout(() => setSaveSuccess(false), 1500);
     };
 
+    // Function to format file sizes with appropriate units
+    const formatFileSize = (bytes: number): string => {
+        if (bytes === 0) return '0 B';
+        const units = ['B', 'KB', 'MB', 'GB'];
+        const k = 1024;
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${units[i]}`;
+    };
+
     // Function to calculate storage breakdown
     const getStorageBreakdown = async () => {
-        const total = getLocalStorageSize();
+        const [total, importedFilesSize] = await Promise.all([
+            getLocalStorageSize(),
+            getImportedFilesSize()
+        ]);
         const savedConfigs = localStorage.getItem('ollama_saved_configs')?.length || 0;
         const chatHistory = localStorage.getItem('chat_sessions')?.length || 0;
 
@@ -363,9 +376,10 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
         return {
             savedConfigs: (savedConfigs * 2), // multiply by 2 for UTF-16 encoding
             chatHistory: (chatHistory * 2),
+            importedFiles: importedFilesSize,
             installedModels: transformersCacheSize,
             other: Math.max(0, other),
-            total: total + transformersCacheSize // Add cache size to total
+            total: total + transformersCacheSize + importedFilesSize // Add cache and imported files size to total
         };
     };
 
@@ -389,6 +403,7 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
         const [storage, setStorage] = useState({
             savedConfigs: 0,
             chatHistory: 0,
+            importedFiles: 0,
             installedModels: 0,
             other: 0,
             total: 0
@@ -448,32 +463,28 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                     <div className="space-y-2">
                         <div className="flex justify-between text-sm">
                             <span className="text-gray-400">Saved Configs</span>
-                            <span className="text-gray-300">{(storage.savedConfigs / 1024).toFixed(2)} KB</span>
+                            <span className="text-gray-300">{formatFileSize(storage.savedConfigs)}</span>
                         </div>
                         <div className="flex justify-between text-sm">
                             <span className="text-gray-400">Chat History</span>
-                            <span className="text-gray-300">{(storage.chatHistory / 1024).toFixed(2)} KB</span>
+                            <span className="text-gray-300">{formatFileSize(storage.chatHistory)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                            <span className="text-gray-400">Imported Files</span>
+                            <span className="text-gray-300">{formatFileSize(storage.importedFiles)}</span>
                         </div>
                         <div className="flex justify-between text-sm">
                             <span className="text-gray-400">Installed Models</span>
-                            <span className="text-gray-300">
-                                {storage.installedModels > 1024 * 1024 
-                                    ? `${(storage.installedModels / (1024 * 1024)).toFixed(2)} MB`
-                                    : `${(storage.installedModels / 1024).toFixed(2)} KB`}
-                            </span>
+                            <span className="text-gray-300">{formatFileSize(storage.installedModels)}</span>
                         </div>
                         <div className="flex justify-between text-sm">
                             <span className="text-gray-400">Other</span>
-                            <span className="text-gray-300">{(storage.other / 1024).toFixed(2)} KB</span>
+                            <span className="text-gray-300">{formatFileSize(storage.other)}</span>
                         </div>
                         <div className="h-px bg-gray-700 my-2" />
                         <div className="flex justify-between text-sm font-medium">
                             <span className="text-gray-200">Total</span>
-                            <span className="text-gray-200">
-                                {storage.total > 1024 * 1024 
-                                    ? `${(storage.total / (1024 * 1024)).toFixed(2)} MB`
-                                    : `${(storage.total / 1024).toFixed(2)} KB`}
-                            </span>
+                            <span className="text-gray-200">{formatFileSize(storage.total)}</span>
                         </div>
                     </div>
                 </div>
@@ -518,7 +529,7 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                                         </div>
                                         <div className="flex items-center space-x-2">
                                             <span className="text-xs text-gray-400">
-                                                {loadSavedConfigs().length} items • {(storage.savedConfigs / 1024).toFixed(1)} KB
+                                                {loadSavedConfigs().length} items • {formatFileSize(storage.savedConfigs)}
                                             </span>
                                             <button
                                                 onClick={() => setExpandedSection(expandedSection === 'configs' ? null : 'configs')}
@@ -572,7 +583,7 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                                         </div>
                                         <div className="flex items-center space-x-2">
                                             <span className="text-xs text-gray-400">
-                                                {getChatSessions().length} items • {(storage.chatHistory / 1024).toFixed(1)} KB
+                                                {getChatSessions().length} items • {formatFileSize(storage.chatHistory)}
                                             </span>
                                             <button
                                                 onClick={() => setExpandedSection(expandedSection === 'chats' ? null : 'chats')}
@@ -622,7 +633,7 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                                         </div>
                                         <div className="flex items-center space-x-2">
                                             <span className="text-xs text-gray-400">
-                                                {(storage.other / 1024).toFixed(1)} KB
+                                                {formatFileSize(storage.other)}
                                             </span>
                                             <button
                                                 onClick={() => setExpandedSection(expandedSection === 'settings' ? null : 'settings')}
@@ -1079,7 +1090,6 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                             <div className="flex items-center">
                                 <label className="text-xs font-medium text-gray-200 w-24 flex items-center">
                                     <span>API Key</span>
-                                    <InfoIcon content={parameterDescriptions.apiKey} />
                                 </label>
                                 <div className="flex-1 relative">
                                     <input
