@@ -1,4 +1,4 @@
-import React, { useState, memo, useMemo } from 'react';
+import React, { useState, memo, useMemo, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import remarkGfm from 'remark-gfm';
@@ -20,6 +20,7 @@ interface MessageBubbleProps {
             topP: number;
         };
     };
+    onThinkContent?: (content: string | null, isThinking: boolean) => void;
 }
 
 const getDisplayUrl = (url: string): string => {
@@ -355,7 +356,73 @@ const MessageMetadata = memo(({ timestamp, apiSettings, isUser }: {
     );
 });
 
-const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message }) => {
+const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onThinkContent }) => {
+    // Extract think content
+    const { displayContent, thinkContent, isThinking } = useMemo(() => {
+        const thinkStart = message.content.indexOf('<think>');
+        
+        // No think content
+        if (thinkStart === -1) {
+            return { displayContent: message.content, thinkContent: null, isThinking: false };
+        }
+
+        // Extract content before the first <think> tag
+        const beforeThink = message.content.slice(0, thinkStart);
+        
+        // Find the end of the think tag if it exists
+        const thinkEnd = message.content.indexOf('</think>', thinkStart);
+        
+        if (thinkEnd === -1) {
+            // Streaming case: still thinking
+            const thinkContent = message.content.slice(thinkStart + 7);
+            return { 
+                displayContent: beforeThink, 
+                thinkContent, 
+                isThinking: true 
+            };
+        }
+
+        // Handle multiple think tags
+        let currentPos = 0;
+        let thinks: string[] = [];
+        let displayParts: string[] = [];
+        
+        while (true) {
+            const nextThink = message.content.indexOf('<think>', currentPos);
+            if (nextThink === -1) {
+                // Add remaining content to display parts
+                displayParts.push(message.content.slice(currentPos));
+                break;
+            }
+            
+            // Add content before this think tag
+            displayParts.push(message.content.slice(currentPos, nextThink));
+            
+            // Find end of this think section
+            const endThink = message.content.indexOf('</think>', nextThink);
+            if (endThink === -1) {
+                // Unclosed think tag - streaming case
+                thinks.push(message.content.slice(nextThink + 7));
+                break;
+            }
+            
+            // Add think content
+            thinks.push(message.content.slice(nextThink + 7, endThink));
+            currentPos = endThink + 8; // 8 is length of '</think>'
+        }
+        
+        return { 
+            displayContent: displayParts.join('').trim(),
+            thinkContent: thinks.join('\n\n'),
+            isThinking: false
+        };
+    }, [message.content]);
+
+    // Notify parent of think content when it changes
+    useEffect(() => {
+        onThinkContent?.(thinkContent, isThinking);
+    }, [thinkContent, isThinking, onThinkContent]);
+
     return (
         <div className={`flex ${message.isUser ? 'justify-end' : 'justify-start'}`}>
             <div className={`flex flex-col ${message.isUser ? 'max-w-[85%] md:max-w-[75%]' : 'max-w-[90%] md:max-w-[80%]'}`}>
@@ -366,7 +433,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message }) => {
                             ? 'bg-orange-500/20 text-orange-200 border border-orange-500/30' 
                             : 'bg-gray-800'
                 }`}>
-                    <MessageContent content={message.content} isUser={message.isUser} />
+                    <MessageContent content={displayContent} isUser={message.isUser} />
                 </div>
                 <MessageMetadata 
                     timestamp={message.timestamp} 
@@ -376,7 +443,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message }) => {
             </div>
         </div>
     );
-});
+};
 
 MessageBubble.displayName = 'MessageBubble';
 

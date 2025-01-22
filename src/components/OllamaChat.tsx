@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import APISettingsPanel from './OllamaChat/APISettings';
 import { APISettings } from '../types/api';
 import { loadSavedConfigs, getLastUsedConfig, setLastUsedConfig } from '../utils/configStorage';
@@ -11,6 +11,7 @@ import { Switch } from '../components/ui/Switch';
 import EnhancedInput from './OllamaChat/EnhancedInput';
 import ImportedFiles from './OllamaChat/ImportedFiles';
 import { ImportedFile } from '../utils/fileStorage';
+import ThinkBubble from './OllamaChat/ThinkBubble';
 
 interface OllamaChatProps {
     onClose: () => void;
@@ -312,13 +313,6 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose }) => {
         setLastUsedConfig(newSettings);
     };
 
-    // Memoize messages to prevent unnecessary re-renders
-    const messageElements = useMemo(() => (
-        messages.map((message, index) => (
-            <MessageBubble key={`${index}-${message.timestamp.getTime()}`} message={message} />
-        ))
-    ), [messages]);
-
     // Optimize message container scroll handling
     const handleScroll = useCallback(() => {
         if (!messagesContainerRef.current) return;
@@ -429,6 +423,49 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose }) => {
         const fileInfo = `[File: ${file.name}]`;
         setInput(prev => prev + (prev ? ' ' : '') + fileInfo);
     };
+
+    // Update the intersection observer effect to only use necessary attributes
+    useEffect(() => {
+        const scrollContainer = messagesContainerRef.current;
+        if (!scrollContainer) return;
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                entries.forEach(entry => {
+                    const messageElement = entry.target;
+                    const hasThink = messageElement.getAttribute('data-has-think') === 'true';
+                    
+                    if (hasThink) {
+                        messageElement.classList.toggle('think-visible', entry.isIntersecting);
+                    }
+                });
+            },
+            {
+                root: scrollContainer,
+                threshold: 0.5
+            }
+        );
+
+        const messageBubbles = scrollContainer.querySelectorAll('[data-has-think]');
+        messageBubbles.forEach(bubble => observer.observe(bubble));
+
+        return () => observer.disconnect();
+    }, [messages]);
+
+    // Handler for think content updates from MessageBubble
+    const handleThinkContent = useCallback((messageId: string, content: string | null, thinking: boolean) => {
+        const messageElement = document.querySelector(`[data-message-id="${messageId}"]`);
+        if (messageElement) {
+            if (content) {
+                messageElement.setAttribute('data-has-think', 'true');
+                messageElement.setAttribute('data-think-content', content);
+            } else {
+                messageElement.removeAttribute('data-has-think');
+                messageElement.removeAttribute('data-think-content');
+            }
+            messageElement.classList.toggle('thinking', thinking);
+        }
+    }, []);
 
     return (
         <div className="fixed inset-0 bg-gray-900 flex flex-col font-chat">
@@ -910,7 +947,41 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose }) => {
                                         </div>
                                     </div>
                                 </div>
-                            ) : messageElements}
+                            ) : (
+                                <>
+                                    {messages.map((message, index) => (
+                                        <div key={index} 
+                                             data-message-id={`message-${index}`}
+                                             className="space-y-2">
+                                            {!message.isUser && (
+                                                <ThinkBubble 
+                                                    content={(() => {
+                                                        const thinkStart = message.content.indexOf('<think>');
+                                                        if (thinkStart === -1) return '';
+                                                        
+                                                        const thinkEnd = message.content.indexOf('</think>', thinkStart);
+                                                        if (thinkEnd === -1) {
+                                                            // Streaming case: show all content after <think>
+                                                            return message.content.slice(thinkStart + 7);
+                                                        }
+                                                        
+                                                        // Completed think tag case
+                                                        return message.content.slice(thinkStart + 7, thinkEnd);
+                                                    })()}
+                                                    isVisible={message.content.includes('<think>')}
+                                                    isThinking={message.content.includes('<think>') && !message.content.includes('</think>')}
+                                                />
+                                            )}
+                                            <MessageBubble 
+                                                message={message} 
+                                                onThinkContent={(content, thinking) => 
+                                                    handleThinkContent(`message-${index}`, content, thinking)
+                                                }
+                                            />
+                                        </div>
+                                    ))}
+                                </>
+                            )}
                         </div>
                     </div>
 
