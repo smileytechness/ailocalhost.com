@@ -119,10 +119,19 @@ function classifyError(error: Error): {
 
     const errorMsg = error.message.toLowerCase();
     
-    // BROWSER ERRORS
+    // First check for browser-level errors as they should take precedence
     if (
         errorMsg.includes('blocked_by_client') || 
-        errorMsg.includes('mixed content')
+        errorMsg.includes('mixed content') ||
+        errorMsg.includes('mixed-content') ||
+        errorMsg.includes('Mixed Content') ||
+        errorMsg.includes('net::err_blocked_by_client') ||
+        errorMsg.includes('not allowed to request resource') ||
+        errorMsg.includes('blocked:mixed') ||
+        // Add additional mixed content variations
+        errorMsg.includes('blocked by client') ||
+        errorMsg.includes('blocked:mixed-content') ||
+        errorMsg.includes('insecure content')
     ) {
         classification.browserStatus = 'error';
         classification.networkStatus = 'skipped';
@@ -131,7 +140,16 @@ function classifyError(error: Error): {
         return classification;
     }
 
-    // NETWORK ERRORS
+    // Check for local access blocked errors
+    if (errorMsg.includes('local access blocked')) {
+        classification.browserStatus = 'error';
+        classification.networkStatus = 'skipped';
+        classification.serverStatus = 'skipped';
+        classification.errorType = 'local_access_blocked';
+        return classification;
+    }
+
+    // Only check network errors if no browser errors were found
     if (errorMsg.includes('net::err_connection_timed_out')) {
         classification.browserStatus = 'success';
         classification.networkStatus = 'error';
@@ -156,11 +174,33 @@ function classifyError(error: Error): {
         return classification;
     }
 
+    // Special handling for 'failed to fetch' - check if it's due to mixed content
     if (errorMsg.includes('failed to fetch')) {
-        classification.browserStatus = 'success';
-        classification.networkStatus = 'error';
-        classification.serverStatus = 'skipped';
-        classification.errorType = 'failed_fetch';
+        // If the error message contains any mixed content indicators, treat it as a browser error
+        if (
+            errorMsg.includes('blocked_by_client') || 
+            errorMsg.includes('mixed content') ||
+            errorMsg.includes('mixed-content') ||
+            errorMsg.includes('Mixed Content') ||
+            errorMsg.includes('net::err_blocked_by_client') ||
+            errorMsg.includes('not allowed to request resource') ||
+            errorMsg.includes('blocked:mixed') ||
+            // Add additional mixed content variations
+            errorMsg.includes('blocked by client') ||
+            errorMsg.includes('blocked:mixed-content') ||
+            errorMsg.includes('insecure content') // Often mixed content errors mention HTTPS
+        ) {
+            classification.browserStatus = 'error';
+            classification.networkStatus = 'skipped';
+            classification.serverStatus = 'skipped';
+            classification.errorType = 'mixed_content';
+        } else {
+            // Otherwise, treat it as a network error
+            classification.browserStatus = 'success';
+            classification.networkStatus = 'error';
+            classification.serverStatus = 'skipped';
+            classification.errorType = 'failed_fetch';
+        }
         return classification;
     }
 
