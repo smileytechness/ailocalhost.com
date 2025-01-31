@@ -139,8 +139,10 @@ function classifyError(error: Error): {
             lowerMsg.includes('blocked due to mixed content') ||
             (
                 lowerMsg.includes('blocked') && 
-                lowerMsg.includes('https') && 
-                lowerMsg.includes('http:')
+                (
+                    (lowerMsg.includes('https') && lowerMsg.includes('http:')) ||
+                    lowerMsg.includes('secure') && lowerMsg.includes('insecure')
+                )
             )
         );
     };
@@ -185,12 +187,42 @@ function classifyError(error: Error): {
         };
     };
 
+    // Store the current error state in localStorage to maintain context between error events
+    const prevError = localStorage.getItem('prevErrorState');
+    let hasPreviousMixedContent = false;
+    
+    if (prevError) {
+        try {
+            const prevErrorState = JSON.parse(prevError);
+            // If we had a mixed content error before, maintain that state
+            if (prevErrorState.errorType === 'mixed_content') {
+                hasPreviousMixedContent = true;
+                classification.browserStatus = 'error';
+                classification.networkStatus = 'skipped';
+                classification.serverStatus = 'skipped';
+                classification.errorType = 'mixed_content';
+                // Limit error message accumulation to last 3 messages
+                const messages = [...(prevErrorState.technicalError || '').split('\n'), error.message]
+                    .filter(Boolean)
+                    .slice(-3);
+                classification.technicalError = messages.join('\n');
+                return classification;
+            }
+        } catch (e) {
+            // If there's any error parsing the previous state, clear it
+            localStorage.removeItem('prevErrorState');
+        }
+    }
+
     // First check for browser-level errors in both message and stack
-    if (hasMixedContentIndicators(fullErrorText)) {
+    const hasMixedContent = hasMixedContentIndicators(fullErrorText);
+    if (hasMixedContent || hasPreviousMixedContent) {
         classification.browserStatus = 'error';
         classification.networkStatus = 'skipped';
         classification.serverStatus = 'skipped';
         classification.errorType = 'mixed_content';
+        // Store this error state
+        localStorage.setItem('prevErrorState', JSON.stringify(classification));
         return classification;
     }
 
@@ -200,17 +232,19 @@ function classifyError(error: Error): {
         classification.networkStatus = 'skipped';
         classification.serverStatus = 'skipped';
         classification.errorType = 'local_access_blocked';
+        localStorage.setItem('prevErrorState', JSON.stringify(classification));
         return classification;
     }
 
     // Check for network errors
     if (hasNetworkError(fullErrorText)) {
         // Double check it's not actually a mixed content error
-        if (hasMixedContentIndicators(fullErrorText)) {
+        if (hasMixedContent || hasPreviousMixedContent) {
             classification.browserStatus = 'error';
             classification.networkStatus = 'skipped';
             classification.serverStatus = 'skipped';
             classification.errorType = 'mixed_content';
+            localStorage.setItem('prevErrorState', JSON.stringify(classification));
             return classification;
         }
         
@@ -218,6 +252,7 @@ function classifyError(error: Error): {
         classification.networkStatus = 'error';
         classification.serverStatus = 'skipped';
         classification.errorType = 'failed_fetch';
+        localStorage.setItem('prevErrorState', JSON.stringify(classification));
         return classification;
     }
 
@@ -230,6 +265,7 @@ function classifyError(error: Error): {
         classification.networkStatus = 'success';
         classification.serverStatus = 'error';
         classification.errorType = 'endpoint_not_found';
+        localStorage.setItem('prevErrorState', JSON.stringify(classification));
         return classification;
     }
 
@@ -239,6 +275,7 @@ function classifyError(error: Error): {
         classification.networkStatus = 'success';
         classification.serverStatus = 'error';
         classification.errorType = 'cors';
+        localStorage.setItem('prevErrorState', JSON.stringify(classification));
         return classification;
     }
 
@@ -248,9 +285,12 @@ function classifyError(error: Error): {
         classification.networkStatus = 'success';
         classification.serverStatus = 'error';
         classification.errorType = 'auth';
+        localStorage.setItem('prevErrorState', JSON.stringify(classification));
         return classification;
     }
 
+    // Clear previous error state if we reach here
+    localStorage.removeItem('prevErrorState');
     return classification;
 }
 
@@ -303,7 +343,10 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
 
     // Cleanup on unmount
     useEffect(() => {
-        return cleanupTimers;
+        return () => {
+            cleanupTimers();
+            localStorage.removeItem('prevErrorState');
+        };
     }, []);
 
     // Initial load check
@@ -363,7 +406,17 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
     }, [settings.serverUrl, settings.apiKey, settings.model, runImmediateCheck]);
 
     const checkServerStatus = async () => {
-        if (!settings.serverUrl) return;
+        if (!settings.serverUrl) {
+            onStatusUpdate('unchecked');
+            setStatus(prev => ({
+                ...prev,
+                http: 'unchecked',
+                lan: 'unchecked',
+                cors: 'unchecked',
+                errors: []
+            }));
+            return;
+        }
 
         setIsChecking(true);
         setStatus({
@@ -373,6 +426,9 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
             errors: []
         });
         onStatusUpdate('loading');
+
+        // Clear any previous error state before starting new check
+        localStorage.removeItem('prevErrorState');
 
         const modelsUrl = settings.serverUrl.replace(/\/v1.*/i, '/v1/models');
 
@@ -385,13 +441,6 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
             });
 
             if (!response.ok) {
-                // Handle HTTP error responses
-                if (response.status === 401 || response.status === 403) {
-                    throw new Error(`Authentication failed: ${response.status}`);
-                }
-                if (response.status === 404) {
-                    throw new Error(`URL not found: ${response.status} - The server endpoint path is incorrect`);
-                }
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
@@ -400,26 +449,29 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
             if (data.object === 'list' && Array.isArray(data.data)) {
                 const modelNames = data.data.map((model: { id: string }) => model.id);
                 setModels(modelNames);
+                
+                // Atomic success state update
+                const currentErrorState = localStorage.getItem('prevErrorState');
+                if (!currentErrorState) {
+                    const successState: LocalServerStatus = {
+                        http: 'success',
+                        lan: 'success',
+                        cors: 'success',
+                        errors: []
+                    };
+                    setStatus(successState);
+                    onStatusUpdate('success');
+                }
             } else {
                 throw new Error('Unexpected response format: ' + JSON.stringify(data));
             }
-
-            setStatus(prev => ({
-                ...prev,
-                http: 'success',
-                lan: 'success',
-                cors: 'success',
-                errors: []
-            }));
-            onStatusUpdate('success');
         } catch (error) {
             console.error('Server Check Error:', error);
             
-            // Use our error classification system
             const classification = classifyError(error instanceof Error ? error : new Error(String(error)));
             
-            setStatus(prev => ({
-                ...prev,
+            // Atomic error state update
+            const errorState: LocalServerStatus = {
                 http: classification.browserStatus,
                 lan: classification.networkStatus,
                 cors: classification.serverStatus,
@@ -428,16 +480,10 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                     message: classification.technicalError,
                     details: error instanceof Error ? error.stack : undefined
                 }]
-            }));
+            };
             
-            // Update the overall status based on the most severe error
-            if (classification.browserStatus === 'error' || 
-                classification.networkStatus === 'error' || 
-                classification.serverStatus === 'error') {
-                onStatusUpdate('error');
-            } else {
-                onStatusUpdate('success');
-            }
+            setStatus(errorState);
+            onStatusUpdate('error');
         } finally {
             setIsChecking(false);
         }
