@@ -114,115 +114,29 @@ function classifyError(error: Error): {
         networkStatus: 'unchecked' as LocalServerStatus['lan'],
         serverStatus: 'unchecked' as LocalServerStatus['cors'],
         errorType: 'unknown' as ErrorType,
-        technicalError: error.message || 'Unknown error'
+        technicalError: error.message
     };
 
-    // Combine error message and stack trace for more comprehensive checking
-    const errorMsg = (error.message || '').toLowerCase();
-    const errorStack = (error.stack || '').toLowerCase();
-    const fullErrorText = `${errorMsg} ${errorStack}`;
+    const errorMsg = error.message.toLowerCase();
     
-    // Helper function to check for mixed content indicators
-    const hasMixedContentIndicators = (msg: string) => {
-        const lowerMsg = msg.toLowerCase();
-        return (
-            lowerMsg.includes('blocked_by_client') || 
-            lowerMsg.includes('mixed content') ||
-            lowerMsg.includes('mixed-content') ||
-            lowerMsg.includes('mixed-content blocked') ||
-            lowerMsg.includes('net::err_blocked_by_client') ||
-            lowerMsg.includes('not allowed to request resource') ||
-            lowerMsg.includes('blocked:mixed') ||
-            lowerMsg.includes('blocked by client') ||
-            lowerMsg.includes('blocked:mixed-content') ||
-            lowerMsg.includes('insecure content') ||
-            lowerMsg.includes('blocked due to mixed content') ||
-            (
-                lowerMsg.includes('blocked') && 
-                (
-                    (lowerMsg.includes('https') && lowerMsg.includes('http:')) ||
-                    lowerMsg.includes('secure') && lowerMsg.includes('insecure')
-                )
-            )
-        );
-    };
-
-    // Helper function to check for network-related errors
-    const hasNetworkError = (msg: string) => {
-        const lowerMsg = msg.toLowerCase();
-        return (
-            lowerMsg.includes('net::err_connection_timed_out') ||
-            lowerMsg.includes('net::err_connection_refused') ||
-            lowerMsg.includes('net::err_address_unreachable') ||
-            lowerMsg.includes('failed to fetch') ||
-            lowerMsg.includes('network error') ||
-            lowerMsg.includes('connection failed')
-        );
-    };
-
-    // Helper function to check for server-related errors
-    const hasServerError = (msg: string) => {
-        const lowerMsg = msg.toLowerCase();
-        return {
-            isNotFound: (
-                lowerMsg.includes('404') || 
-                lowerMsg.includes('url not found') ||
-                lowerMsg.includes('endpoint not found') ||
-                lowerMsg.includes('not found') && lowerMsg.includes('server')
-            ),
-            isCors: (
-                lowerMsg.includes('cors') || 
-                lowerMsg.includes('access-control-allow-origin') ||
-                lowerMsg.includes('cross-origin') ||
-                lowerMsg.includes('cross origin')
-            ),
-            isAuth: (
-                lowerMsg.includes('401') ||
-                lowerMsg.includes('403') ||
-                lowerMsg.includes('unauthorized') ||
-                lowerMsg.includes('forbidden') ||
-                lowerMsg.includes('authentication failed') ||
-                lowerMsg.includes('invalid credentials')
-            )
-        };
-    };
-
-    // Store the current error state in localStorage to maintain context between error events
-    const prevError = localStorage.getItem('prevErrorState');
-    let hasPreviousMixedContent = false;
-    
-    if (prevError) {
-        try {
-            const prevErrorState = JSON.parse(prevError);
-            // If we had a mixed content error before, maintain that state
-            if (prevErrorState.errorType === 'mixed_content') {
-                hasPreviousMixedContent = true;
-                classification.browserStatus = 'error';
-                classification.networkStatus = 'skipped';
-                classification.serverStatus = 'skipped';
-                classification.errorType = 'mixed_content';
-                // Limit error message accumulation to last 3 messages
-                const messages = [...(prevErrorState.technicalError || '').split('\n'), error.message]
-                    .filter(Boolean)
-                    .slice(-3);
-                classification.technicalError = messages.join('\n');
-                return classification;
-            }
-        } catch (e) {
-            // If there's any error parsing the previous state, clear it
-            localStorage.removeItem('prevErrorState');
-        }
-    }
-
-    // First check for browser-level errors in both message and stack
-    const hasMixedContent = hasMixedContentIndicators(fullErrorText);
-    if (hasMixedContent || hasPreviousMixedContent) {
+    // First check for browser-level errors as they should take precedence
+    if (
+        errorMsg.includes('blocked_by_client') || 
+        errorMsg.includes('mixed content') ||
+        errorMsg.includes('mixed-content') ||
+        errorMsg.includes('Mixed Content') ||
+        errorMsg.includes('net::err_blocked_by_client') ||
+        errorMsg.includes('not allowed to request resource') ||
+        errorMsg.includes('blocked:mixed') ||
+        // Add additional mixed content variations
+        errorMsg.includes('blocked by client') ||
+        errorMsg.includes('blocked:mixed-content') ||
+        errorMsg.includes('insecure content')
+    ) {
         classification.browserStatus = 'error';
         classification.networkStatus = 'skipped';
         classification.serverStatus = 'skipped';
         classification.errorType = 'mixed_content';
-        // Store this error state
-        localStorage.setItem('prevErrorState', JSON.stringify(classification));
         return classification;
     }
 
@@ -232,65 +146,71 @@ function classifyError(error: Error): {
         classification.networkStatus = 'skipped';
         classification.serverStatus = 'skipped';
         classification.errorType = 'local_access_blocked';
-        localStorage.setItem('prevErrorState', JSON.stringify(classification));
         return classification;
     }
 
-    // Check for network errors
-    if (hasNetworkError(fullErrorText)) {
-        // Double check it's not actually a mixed content error
-        if (hasMixedContent || hasPreviousMixedContent) {
-            classification.browserStatus = 'error';
-            classification.networkStatus = 'skipped';
-            classification.serverStatus = 'skipped';
-            classification.errorType = 'mixed_content';
-            localStorage.setItem('prevErrorState', JSON.stringify(classification));
-            return classification;
-        }
-        
+    // Only check network errors if no browser errors were found
+    if (errorMsg.includes('net::err_connection_timed_out')) {
         classification.browserStatus = 'success';
         classification.networkStatus = 'error';
         classification.serverStatus = 'skipped';
-        classification.errorType = 'failed_fetch';
-        localStorage.setItem('prevErrorState', JSON.stringify(classification));
+        classification.errorType = 'connection_timeout';
         return classification;
     }
 
-    // Check for server errors using the helper function
-    const serverErrors = hasServerError(fullErrorText);
-    
+    if (errorMsg.includes('net::err_connection_refused')) {
+        classification.browserStatus = 'success';
+        classification.networkStatus = 'error';
+        classification.serverStatus = 'skipped';
+        classification.errorType = 'connection_refused';
+        return classification;
+    }
+
+    if (errorMsg.includes('net::err_address_unreachable')) {
+        classification.browserStatus = 'success';
+        classification.networkStatus = 'error';
+        classification.serverStatus = 'skipped';
+        classification.errorType = 'address_unreachable';
+        return classification;
+    }
+
+
+    // SERVER ERRORS
     // 404 errors (endpoint not found)
-    if (serverErrors.isNotFound) {
+    if (errorMsg.includes('404') || errorMsg.includes('url not found')) {
         classification.browserStatus = 'success';
         classification.networkStatus = 'success';
         classification.serverStatus = 'error';
         classification.errorType = 'endpoint_not_found';
-        localStorage.setItem('prevErrorState', JSON.stringify(classification));
         return classification;
     }
 
     // CORS errors
-    if (serverErrors.isCors) {
+    if (
+        errorMsg.includes('cors') || 
+        errorMsg.includes('access-control-allow-origin')
+    ) {
         classification.browserStatus = 'success';
         classification.networkStatus = 'success';
         classification.serverStatus = 'error';
         classification.errorType = 'cors';
-        localStorage.setItem('prevErrorState', JSON.stringify(classification));
         return classification;
     }
 
     // Authentication errors
-    if (serverErrors.isAuth) {
+    if (
+        errorMsg.includes('authentication failed') ||
+        errorMsg.includes('401') ||
+        errorMsg.includes('403') ||
+        errorMsg.includes('unauthorized')
+    ) {
         classification.browserStatus = 'success';
         classification.networkStatus = 'success';
         classification.serverStatus = 'error';
         classification.errorType = 'auth';
-        localStorage.setItem('prevErrorState', JSON.stringify(classification));
         return classification;
     }
 
-    // Clear previous error state if we reach here
-    localStorage.removeItem('prevErrorState');
     return classification;
 }
 
@@ -343,10 +263,7 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
 
     // Cleanup on unmount
     useEffect(() => {
-        return () => {
-            cleanupTimers();
-            localStorage.removeItem('prevErrorState');
-        };
+        return cleanupTimers;
     }, []);
 
     // Initial load check
@@ -406,17 +323,7 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
     }, [settings.serverUrl, settings.apiKey, settings.model, runImmediateCheck]);
 
     const checkServerStatus = async () => {
-        if (!settings.serverUrl) {
-            onStatusUpdate('unchecked');
-            setStatus(prev => ({
-                ...prev,
-                http: 'unchecked',
-                lan: 'unchecked',
-                cors: 'unchecked',
-                errors: []
-            }));
-            return;
-        }
+        if (!settings.serverUrl) return;
 
         setIsChecking(true);
         setStatus({
@@ -426,9 +333,6 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
             errors: []
         });
         onStatusUpdate('loading');
-
-        // Clear any previous error state before starting new check
-        localStorage.removeItem('prevErrorState');
 
         const modelsUrl = settings.serverUrl.replace(/\/v1.*/i, '/v1/models');
 
@@ -441,6 +345,13 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
             });
 
             if (!response.ok) {
+                // Handle HTTP error responses
+                if (response.status === 401 || response.status === 403) {
+                    throw new Error(`Authentication failed: ${response.status}`);
+                }
+                if (response.status === 404) {
+                    throw new Error(`URL not found: ${response.status} - The server endpoint path is incorrect`);
+                }
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
@@ -449,29 +360,26 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
             if (data.object === 'list' && Array.isArray(data.data)) {
                 const modelNames = data.data.map((model: { id: string }) => model.id);
                 setModels(modelNames);
-                
-                // Atomic success state update
-                const currentErrorState = localStorage.getItem('prevErrorState');
-                if (!currentErrorState) {
-                    const successState: LocalServerStatus = {
-                        http: 'success',
-                        lan: 'success',
-                        cors: 'success',
-                        errors: []
-                    };
-                    setStatus(successState);
-                    onStatusUpdate('success');
-                }
             } else {
                 throw new Error('Unexpected response format: ' + JSON.stringify(data));
             }
+
+            setStatus(prev => ({
+                ...prev,
+                http: 'success',
+                lan: 'success',
+                cors: 'success',
+                errors: []
+            }));
+            onStatusUpdate('success');
         } catch (error) {
             console.error('Server Check Error:', error);
             
+            // Use our error classification system
             const classification = classifyError(error instanceof Error ? error : new Error(String(error)));
             
-            // Atomic error state update
-            const errorState: LocalServerStatus = {
+            setStatus(prev => ({
+                ...prev,
                 http: classification.browserStatus,
                 lan: classification.networkStatus,
                 cors: classification.serverStatus,
@@ -480,10 +388,16 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                     message: classification.technicalError,
                     details: error instanceof Error ? error.stack : undefined
                 }]
-            };
+            }));
             
-            setStatus(errorState);
-            onStatusUpdate('error');
+            // Update the overall status based on the most severe error
+            if (classification.browserStatus === 'error' || 
+                classification.networkStatus === 'error' || 
+                classification.serverStatus === 'error') {
+                onStatusUpdate('error');
+            } else {
+                onStatusUpdate('success');
+            }
         } finally {
             setIsChecking(false);
         }
