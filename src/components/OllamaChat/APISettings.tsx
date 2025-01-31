@@ -19,12 +19,30 @@ interface APISettingsPanelProps {
 }
 
 // Add new type for auth error
-type ErrorType = 'mixed_content' | 'network' | 'cors' | 'auth' | 'unknown';
+type ErrorType = 
+  // Browser Errors
+  | 'mixed_content'
+  | 'local_access_blocked'
+  
+  // Network Errors
+  | 'connection_refused'
+  | 'connection_timeout'
+  | 'address_unreachable'
+  | 'failed_fetch'
+  
+  // Server Errors
+  | 'cors'
+  | 'auth'
+  | 'endpoint_not_found'
+  | 'server_error'
+  
+  // Fallback
+  | 'unknown';
 
 interface DetailedError {
     type: ErrorType;
-    message: string;
-    details?: string;
+    message: string;  // Exact browser console error
+    details?: string; // Additional error stack or details
 }
 
 // Update LocalServerStatus to include more specific error tracking
@@ -81,6 +99,108 @@ interface ImportSummary {
     chatTitles: string[];
     duplicateConfigs: APISettings[];
     duplicateChats: ChatSession[];
+}
+
+// Error classification function
+function classifyError(error: Error): {
+    browserStatus: LocalServerStatus['http'];
+    networkStatus: LocalServerStatus['lan'];
+    serverStatus: LocalServerStatus['cors'];
+    errorType: ErrorType;
+    technicalError: string;
+} {
+    const classification = {
+        browserStatus: 'unchecked' as LocalServerStatus['http'],
+        networkStatus: 'unchecked' as LocalServerStatus['lan'],
+        serverStatus: 'unchecked' as LocalServerStatus['cors'],
+        errorType: 'unknown' as ErrorType,
+        technicalError: error.message
+    };
+
+    const errorMsg = error.message.toLowerCase();
+    
+    // BROWSER ERRORS
+    if (
+        errorMsg.includes('blocked_by_client') || 
+        errorMsg.includes('mixed content')
+    ) {
+        classification.browserStatus = 'error';
+        classification.networkStatus = 'skipped';
+        classification.serverStatus = 'skipped';
+        classification.errorType = 'mixed_content';
+        return classification;
+    }
+
+    // NETWORK ERRORS
+    if (errorMsg.includes('net::err_connection_timed_out')) {
+        classification.browserStatus = 'success';
+        classification.networkStatus = 'error';
+        classification.serverStatus = 'skipped';
+        classification.errorType = 'connection_timeout';
+        return classification;
+    }
+
+    if (errorMsg.includes('net::err_connection_refused')) {
+        classification.browserStatus = 'success';
+        classification.networkStatus = 'error';
+        classification.serverStatus = 'skipped';
+        classification.errorType = 'connection_refused';
+        return classification;
+    }
+
+    if (errorMsg.includes('net::err_address_unreachable')) {
+        classification.browserStatus = 'success';
+        classification.networkStatus = 'error';
+        classification.serverStatus = 'skipped';
+        classification.errorType = 'address_unreachable';
+        return classification;
+    }
+
+    if (errorMsg.includes('failed to fetch')) {
+        classification.browserStatus = 'success';
+        classification.networkStatus = 'error';
+        classification.serverStatus = 'skipped';
+        classification.errorType = 'failed_fetch';
+        return classification;
+    }
+
+    // SERVER ERRORS
+    // 404 errors (endpoint not found)
+    if (errorMsg.includes('404') || errorMsg.includes('url not found')) {
+        classification.browserStatus = 'success';
+        classification.networkStatus = 'success';
+        classification.serverStatus = 'error';
+        classification.errorType = 'endpoint_not_found';
+        return classification;
+    }
+
+    // CORS errors
+    if (
+        errorMsg.includes('cors') || 
+        errorMsg.includes('access-control-allow-origin')
+    ) {
+        classification.browserStatus = 'success';
+        classification.networkStatus = 'success';
+        classification.serverStatus = 'error';
+        classification.errorType = 'cors';
+        return classification;
+    }
+
+    // Authentication errors
+    if (
+        errorMsg.includes('authentication failed') ||
+        errorMsg.includes('401') ||
+        errorMsg.includes('403') ||
+        errorMsg.includes('unauthorized')
+    ) {
+        classification.browserStatus = 'success';
+        classification.networkStatus = 'success';
+        classification.serverStatus = 'error';
+        classification.errorType = 'auth';
+        return classification;
+    }
+
+    return classification;
 }
 
 const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
@@ -243,67 +363,30 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
             onStatusUpdate('success');
         } catch (error) {
             console.error('Server Check Error:', error);
-            let errorType: ErrorType = 'unknown';
-            let errorMessage = 'An unknown error occurred.';
-            let newStatus = {
-                http: 'success' as LocalServerStatus['http'],
-                lan: 'success' as LocalServerStatus['lan'],
-                cors: 'success' as LocalServerStatus['cors'],
-                errors: []
-            };
-
-            if (error instanceof Error) {
-                const errorMsg = error.message.toLowerCase();
-                
-                // Check for browser-related errors (BROWSER category)
-                if (errorMsg.includes('blocked_by_client') || errorMsg.includes('mixed content')) {
-                    errorType = 'mixed_content';
-                    errorMessage = 'Browser Security Error: HTTPS page cannot access HTTP server or request blocked by client.';
-                    newStatus.http = 'error';
-                }
-                // Check for network errors (NETWORK category)
-                else if (
-                    errorMsg.includes('net::err_connection_timed_out') ||
-                    errorMsg.includes('net::err_connection_refused') ||
-                    errorMsg.includes('net::err_address_unreachable') ||
-                    errorMsg.includes('failed to fetch') ||
-                    errorMsg.includes('404') ||
-                    errorMsg.includes('url not found')
-                ) {
-                    errorType = 'network';
-                    errorMessage = errorMsg.includes('404') ? 
-                        'Network Error: The server endpoint URL is incorrect. Please check the URL path.' :
-                        'Network Error: Server is unreachable on the network.';
-                    newStatus.lan = 'error';
-                }
-                // Check for CORS errors (SERVER category)
-                else if (errorMsg.includes('cors') || errorMsg.includes('access-control-allow-origin')) {
-                    errorType = 'cors';
-                    errorMessage = 'Server Error: CORS policy is blocking access.';
-                    newStatus.cors = 'error';
-                }
-                // Check for authentication errors (SERVER category)
-                else if (
-                    errorMsg.includes('authentication failed') ||
-                    errorMsg.includes('401') ||
-                    errorMsg.includes('403') ||
-                    errorMsg.includes('unauthorized')
-                ) {
-                    errorType = 'auth';
-                    errorMessage = 'Authentication Error: Invalid or missing API key.';
-                    newStatus.cors = 'error';
-                }
-            }
-
-            setStatus({
-                ...newStatus,
+            
+            // Use our error classification system
+            const classification = classifyError(error instanceof Error ? error : new Error(String(error)));
+            
+            setStatus(prev => ({
+                ...prev,
+                http: classification.browserStatus,
+                lan: classification.networkStatus,
+                cors: classification.serverStatus,
                 errors: [{
-                    type: errorType,
-                    message: errorMessage,
-                    details: error instanceof Error ? error.message : 'Unknown error'
+                    type: classification.errorType,
+                    message: classification.technicalError,
+                    details: error instanceof Error ? error.stack : undefined
                 }]
-            });
-            onStatusUpdate('error');
+            }));
+            
+            // Update the overall status based on the most severe error
+            if (classification.browserStatus === 'error' || 
+                classification.networkStatus === 'error' || 
+                classification.serverStatus === 'error') {
+                onStatusUpdate('error');
+            } else {
+                onStatusUpdate('success');
+            }
         } finally {
             setIsChecking(false);
         }
@@ -1027,11 +1110,17 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                         {status.errors.length > 0 && (
                             <div className="mt-2 p-3 bg-red-900/20 rounded-md">
                                 <h4 className="text-sm font-medium text-red-200">Errors:</h4>
-                                <ul className="mt-1 text-sm text-red-300">
+                                <ul className="mt-1 space-y-2">
                                     {status.errors.map((error, index) => (
-                                        <li key={index}>
-                                            <strong>{error.message}</strong>
-                                            {error.details && <p className="text-xs mt-1">{error.details}</p>}
+                                        <li key={index} className="text-sm">
+                                            <div className="text-red-300 break-words">
+                                                <strong className="font-medium">{error.message}</strong>
+                                            </div>
+                                            {error.details && (
+                                                <div className="mt-1 text-xs text-red-400 break-words whitespace-pre-wrap max-h-24 overflow-y-auto">
+                                                    {error.details}
+                                                </div>
+                                            )}
                                         </li>
                                     ))}
                                 </ul>
