@@ -114,25 +114,79 @@ function classifyError(error: Error): {
         networkStatus: 'unchecked' as LocalServerStatus['lan'],
         serverStatus: 'unchecked' as LocalServerStatus['cors'],
         errorType: 'unknown' as ErrorType,
-        technicalError: error.message
+        technicalError: error.message || 'Unknown error'
     };
 
-    const errorMsg = error.message.toLowerCase();
+    // Combine error message and stack trace for more comprehensive checking
+    const errorMsg = (error.message || '').toLowerCase();
+    const errorStack = (error.stack || '').toLowerCase();
+    const fullErrorText = `${errorMsg} ${errorStack}`;
     
-    // First check for browser-level errors as they should take precedence
-    if (
-        errorMsg.includes('blocked_by_client') || 
-        errorMsg.includes('mixed content') ||
-        errorMsg.includes('mixed-content') ||
-        errorMsg.includes('Mixed Content') ||
-        errorMsg.includes('net::err_blocked_by_client') ||
-        errorMsg.includes('not allowed to request resource') ||
-        errorMsg.includes('blocked:mixed') ||
-        // Add additional mixed content variations
-        errorMsg.includes('blocked by client') ||
-        errorMsg.includes('blocked:mixed-content') ||
-        errorMsg.includes('insecure content')
-    ) {
+    // Helper function to check for mixed content indicators
+    const hasMixedContentIndicators = (msg: string) => {
+        const lowerMsg = msg.toLowerCase();
+        return (
+            lowerMsg.includes('blocked_by_client') || 
+            lowerMsg.includes('mixed content') ||
+            lowerMsg.includes('mixed-content') ||
+            lowerMsg.includes('mixed-content blocked') ||
+            lowerMsg.includes('net::err_blocked_by_client') ||
+            lowerMsg.includes('not allowed to request resource') ||
+            lowerMsg.includes('blocked:mixed') ||
+            lowerMsg.includes('blocked by client') ||
+            lowerMsg.includes('blocked:mixed-content') ||
+            lowerMsg.includes('insecure content') ||
+            lowerMsg.includes('blocked due to mixed content') ||
+            (
+                lowerMsg.includes('blocked') && 
+                lowerMsg.includes('https') && 
+                lowerMsg.includes('http:')
+            )
+        );
+    };
+
+    // Helper function to check for network-related errors
+    const hasNetworkError = (msg: string) => {
+        const lowerMsg = msg.toLowerCase();
+        return (
+            lowerMsg.includes('net::err_connection_timed_out') ||
+            lowerMsg.includes('net::err_connection_refused') ||
+            lowerMsg.includes('net::err_address_unreachable') ||
+            lowerMsg.includes('failed to fetch') ||
+            lowerMsg.includes('network error') ||
+            lowerMsg.includes('connection failed')
+        );
+    };
+
+    // Helper function to check for server-related errors
+    const hasServerError = (msg: string) => {
+        const lowerMsg = msg.toLowerCase();
+        return {
+            isNotFound: (
+                lowerMsg.includes('404') || 
+                lowerMsg.includes('url not found') ||
+                lowerMsg.includes('endpoint not found') ||
+                lowerMsg.includes('not found') && lowerMsg.includes('server')
+            ),
+            isCors: (
+                lowerMsg.includes('cors') || 
+                lowerMsg.includes('access-control-allow-origin') ||
+                lowerMsg.includes('cross-origin') ||
+                lowerMsg.includes('cross origin')
+            ),
+            isAuth: (
+                lowerMsg.includes('401') ||
+                lowerMsg.includes('403') ||
+                lowerMsg.includes('unauthorized') ||
+                lowerMsg.includes('forbidden') ||
+                lowerMsg.includes('authentication failed') ||
+                lowerMsg.includes('invalid credentials')
+            )
+        };
+    };
+
+    // First check for browser-level errors in both message and stack
+    if (hasMixedContentIndicators(fullErrorText)) {
         classification.browserStatus = 'error';
         classification.networkStatus = 'skipped';
         classification.serverStatus = 'skipped';
@@ -149,64 +203,29 @@ function classifyError(error: Error): {
         return classification;
     }
 
-    // Only check network errors if no browser errors were found
-    if (errorMsg.includes('net::err_connection_timed_out')) {
-        classification.browserStatus = 'success';
-        classification.networkStatus = 'error';
-        classification.serverStatus = 'skipped';
-        classification.errorType = 'connection_timeout';
-        return classification;
-    }
-
-    if (errorMsg.includes('net::err_connection_refused')) {
-        classification.browserStatus = 'success';
-        classification.networkStatus = 'error';
-        classification.serverStatus = 'skipped';
-        classification.errorType = 'connection_refused';
-        return classification;
-    }
-
-    if (errorMsg.includes('net::err_address_unreachable')) {
-        classification.browserStatus = 'success';
-        classification.networkStatus = 'error';
-        classification.serverStatus = 'skipped';
-        classification.errorType = 'address_unreachable';
-        return classification;
-    }
-
-    // Special handling for 'failed to fetch' - check if it's due to mixed content
-    if (errorMsg.includes('failed to fetch')) {
-        // If the error message contains any mixed content indicators, treat it as a browser error
-        if (
-            errorMsg.includes('blocked_by_client') || 
-            errorMsg.includes('mixed content') ||
-            errorMsg.includes('mixed-content') ||
-            errorMsg.includes('Mixed Content') ||
-            errorMsg.includes('net::err_blocked_by_client') ||
-            errorMsg.includes('not allowed to request resource') ||
-            errorMsg.includes('blocked:mixed') ||
-            // Add additional mixed content variations
-            errorMsg.includes('blocked by client') ||
-            errorMsg.includes('blocked:mixed-content') ||
-            errorMsg.includes('insecure content') // Often mixed content errors mention HTTPS
-        ) {
+    // Check for network errors
+    if (hasNetworkError(fullErrorText)) {
+        // Double check it's not actually a mixed content error
+        if (hasMixedContentIndicators(fullErrorText)) {
             classification.browserStatus = 'error';
             classification.networkStatus = 'skipped';
             classification.serverStatus = 'skipped';
             classification.errorType = 'mixed_content';
-        } else {
-            // Otherwise, treat it as a network error
-            classification.browserStatus = 'success';
-            classification.networkStatus = 'error';
-            classification.serverStatus = 'skipped';
-            classification.errorType = 'failed_fetch';
+            return classification;
         }
+        
+        classification.browserStatus = 'success';
+        classification.networkStatus = 'error';
+        classification.serverStatus = 'skipped';
+        classification.errorType = 'failed_fetch';
         return classification;
     }
 
-    // SERVER ERRORS
+    // Check for server errors using the helper function
+    const serverErrors = hasServerError(fullErrorText);
+    
     // 404 errors (endpoint not found)
-    if (errorMsg.includes('404') || errorMsg.includes('url not found')) {
+    if (serverErrors.isNotFound) {
         classification.browserStatus = 'success';
         classification.networkStatus = 'success';
         classification.serverStatus = 'error';
@@ -215,10 +234,7 @@ function classifyError(error: Error): {
     }
 
     // CORS errors
-    if (
-        errorMsg.includes('cors') || 
-        errorMsg.includes('access-control-allow-origin')
-    ) {
+    if (serverErrors.isCors) {
         classification.browserStatus = 'success';
         classification.networkStatus = 'success';
         classification.serverStatus = 'error';
@@ -227,12 +243,7 @@ function classifyError(error: Error): {
     }
 
     // Authentication errors
-    if (
-        errorMsg.includes('authentication failed') ||
-        errorMsg.includes('401') ||
-        errorMsg.includes('403') ||
-        errorMsg.includes('unauthorized')
-    ) {
+    if (serverErrors.isAuth) {
         classification.browserStatus = 'success';
         classification.networkStatus = 'success';
         classification.serverStatus = 'error';
