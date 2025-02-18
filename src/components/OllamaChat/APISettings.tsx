@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { APISettings, parameterDescriptions, serverStatusDescriptions } from '../../types/api';
 import { Tooltip } from '../ui/Tooltip';
+import { Switch } from '../ui/Switch';
 import { FiInfo, FiChevronDown, FiEye, FiEyeOff, FiArrowRight, FiRefreshCw } from 'react-icons/fi';
 import { SavedConfigs } from './SavedConfigs';
 import { loadSavedConfigs, saveConfig, setLastUsedConfig } from '../../utils/configStorage';
@@ -9,6 +10,49 @@ import { getLocalStorageSize } from '../../utils/localStorage';
 import { getChatSessions, ChatSession } from '../../utils/chatStorage';
 import { getImportedFilesSize } from '../../utils/fileStorage';
 import ApplicationsSettings from '../ApplicationsSettings';
+import { listCachedModels } from '../../features/transformers/utils/transformersCache';
+
+// At the top of the file, update the existing toggleStyles:
+// const toggleStyles = `
+//   .toggle-checkbox {
+//     position: absolute;
+//     opacity: 0;
+//     width: 0;
+//     height: 0;
+//   }
+//
+//   .toggle-label {
+//     position: relative;
+//     display: block;
+//     height: 24px;
+//     width: 44px;
+//     background: #4B5563;
+//     border-radius: 12px;
+//     cursor: pointer;
+//     transition: all 0.3s ease;
+//   }
+//
+//   .toggle-label:after {
+//     content: '';
+//     position: absolute;
+//     top: 2px;
+//     left: 2px;
+//     width: 20px;
+//     height: 20px;
+//     border-radius: 50%;
+//     background: white;
+//     transition: all 0.3s ease;
+//   }
+//
+//   .toggle-checkbox:checked + .toggle-label {
+//     background: #3B82F6;
+//   }
+//
+//   .toggle-checkbox:checked + .toggle-label:after {
+//     left: calc(100% - 2px);
+//     transform: translateX(-100%);
+//   }
+// `;
 
 interface APISettingsPanelProps {
     settings: APISettings;
@@ -254,6 +298,59 @@ function classifyError(error: Error): {
     return classification;
 }
 
+// First, add this interface near the top with other interfaces
+interface ServerOption {
+    label: string;
+    url: string;
+}
+
+// Add this constant for the server options
+const SERVER_OPTIONS: ServerOption[] = [
+    { label: 'ONNX Runtime (in-browser inference)[testing only]', url: 'Transformers.js' },
+    { label: 'Ollama IP Address (e.g 10.0.0.120)', url: 'http://10.0.0.120:11434/v1/chat/completions' },
+    { label: 'Ollama Local', url: 'http://localhost:11434/v1/chat/completions' },
+    { label: 'Groq', url: 'https://api.groq.com/openai/v1/chat/completions' },
+    { label: 'OpenAI', url: 'https://api.openai.com/v1/chat/completions' },
+    { label: 'Anthropic (not supported yet)', url: 'https://api.anthropic.com/v1/messages' },
+    { label: 'Google AI Studio (not supported yet)', url: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest/generateContent?key=AIzaSyBwz5QZ8YZ7sQ5XZ_N6Mq6MZ_N6M' },
+    { label: 'Custom URL (OpenAI API)', url: '' }
+];
+
+// Add interface for model with pipeline info
+interface ModelInfo {
+    id: string;
+    pipelineType?: string;
+}
+
+// First, create a Toggle component at the top of the file
+// const Toggle: React.FC<{
+//     checked: boolean;
+//     onChange: (checked: boolean) => void;
+//     label: string;
+//     description: string;
+// }> = ({ checked, onChange, label, description }) => (
+//     <div className="flex items-center justify-between">
+//         <div className="flex items-center">
+//             <span className="text-xs font-medium text-gray-200">{label}</span>
+//             <InfoIcon content={description} />
+//         </div>
+//         <label className="relative inline-flex items-center cursor-pointer">
+//             <input
+//                 type="checkbox"
+//                 className="sr-only peer"
+//                 checked={checked}
+//                 onChange={(e) => onChange(e.target.checked)}
+//             />
+//             <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer 
+//                           peer-checked:after:translate-x-full peer-checked:after:border-white 
+//                           after:content-[''] after:absolute after:top-[2px] after:left-[2px] 
+//                           after:bg-white after:rounded-full after:h-5 after:w-5 
+//                           after:transition-all peer-checked:bg-blue-600">
+//             </div>
+//         </label>
+//     </div>
+// );
+
 const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
     settings,
     onSettingsChange,
@@ -272,7 +369,7 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
         lan: 'unchecked',
         errors: []
     });
-    const [models, setModels] = useState<string[]>([]);
+    const [models, setModels] = useState<ModelInfo[]>([]);
     const checkTimeoutRef = useRef<number | null>(null);
     const previousUrlRef = useRef<string>(settings.serverUrl);
     const previousKeyRef = useRef<string>(settings.apiKey);
@@ -374,9 +471,31 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
         });
         onStatusUpdate('loading');
 
-        const modelsUrl = settings.serverUrl.replace(/\/v1.*/i, '/v1/models');
-
         try {
+            // Handle Transformers.js differently
+            if (settings.serverUrl === 'Transformers.js') {
+                const cachedModels = await listCachedModels();
+                setModels(cachedModels.map(model => ({
+                    id: model.modelId,
+                    pipelineType: model.pipelineType
+                })));
+                
+                // Set success status
+                setStatus(prev => ({
+                    ...prev,
+                    http: 'success',
+                    lan: 'success',
+                    cors: 'success',
+                    errors: []
+                }));
+                onStatusUpdate('success');
+                
+                return;
+            }
+
+            // Original server check code continues for other servers
+            const modelsUrl = settings.serverUrl.replace(/\/v1.*/i, '/v1/models');
+
             const response = await fetch(modelsUrl, {
                 method: 'GET',
                 headers: {
@@ -398,8 +517,9 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
             const data = await response.json();
             
             if (data.object === 'list' && Array.isArray(data.data)) {
-                const modelNames = data.data.map((model: { id: string }) => model.id);
-                setModels(modelNames);
+                setModels(data.data.map((model: { id: string }) => ({
+                    id: model.id
+                })));
             } else {
                 throw new Error('Unexpected response format: ' + JSON.stringify(data));
             }
@@ -1198,31 +1318,40 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                         <div className="p-3 bg-gray-800/50 rounded-lg space-y-2 relative z-10">
                             {/* Server URL */}
                             <div className="flex items-center">
-                                <label className="text-xs font-medium text-gray-200 w-24">
-                                    Server URL
-                                </label>
+                                <div className="w-24 relative">
+                                    <select
+                                        value={SERVER_OPTIONS.find(opt => opt.url === settings.serverUrl)?.label || 'Custom Server URL'}
+                                        onChange={(e) => {
+                                            const selected = SERVER_OPTIONS.find(opt => opt.label === e.target.value);
+                                            if (selected) {
+                                                handleSettingsChange({
+                                                    serverUrl: selected.url
+                                                });
+                                            }
+                                        }}
+                                        className="w-full p-1.5 text-xs font-medium border rounded bg-gray-800 text-gray-200 border-gray-700 appearance-none pr-8"
+                                    >
+                                        {SERVER_OPTIONS.map((option) => (
+                                            <option key={option.label} value={option.label}>
+                                                {option.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                                        <FiChevronDown className="h-4 w-4 text-gray-400" />
+                                    </div>
+                                </div>
                                 <input
                                     type="text"
                                     value={settings.serverUrl}
                                     onChange={(e) => {
-                                        try {
-                                            if (e.target.value && !e.target.value.startsWith('http')) {
-                                                handleSettingsChange({
-                                                    serverUrl: `http://${e.target.value}`
-                                                });
-                                            } else {
-                                                handleSettingsChange({
-                                                    serverUrl: e.target.value
-                                                });
-                                            }
-                                        } catch (e) {
-                                            handleSettingsChange({
-                                                serverUrl: (e as React.ChangeEvent<HTMLInputElement>).target.value
-                                            });
-                                        }
+                                        const value = e.target.value;
+                                        handleSettingsChange({
+                                            serverUrl: value.startsWith('http') ? value : `http://${value}`
+                                        });
                                     }}
-                                    placeholder="http://localhost:11434/v1/chat/completions"
-                                    className="flex-1 p-1.5 text-sm border rounded bg-gray-800 text-gray-200 border-gray-700"
+                                    placeholder="Enter server URL..."
+                                    className="flex-1 p-1.5 text-sm border rounded bg-gray-800 text-gray-200 border-gray-700 ml-2"
                                 />
                             </div>
 
@@ -1265,9 +1394,9 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                                         className="w-full p-1.5 text-sm border rounded bg-gray-800 text-gray-200 border-gray-700 appearance-none"
                                     >
                                         <option value="" className="text-sm">Select a model</option>
-                                        {models.map((modelName, index) => (
-                                            <option key={index} value={modelName} className="text-sm">
-                                                {modelName}
+                                        {models.map((model, index) => (
+                                            <option key={index} value={model.id} className="text-sm">
+                                                {model.id}{model.pipelineType ? ` (${model.pipelineType})` : ''}
                                             </option>
                                         ))}
                                     </select>
@@ -1468,6 +1597,212 @@ const APISettingsPanel: React.FC<APISettingsPanelProps> = ({
                                         className="w-full accent-blue-600"
                                     />
                                 </div>
+                            </div>
+                        </div>
+
+                        {/* Text Generation Parameters in Grid */}
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="p-3 bg-gray-800/50 rounded-lg"></div>
+                            <div className="p-3 bg-gray-800/50 rounded-lg"></div>
+                         {/* Comment out Top K and Number of Beams for now
+                            <div className="p-3 bg-gray-800/50 rounded-lg">
+                                <label className="block text-xs font-medium mb-1 flex items-center justify-between text-gray-200">
+                                    <div className="flex items-center">
+                                        <span>Top K</span>
+                                        <InfoIcon content={parameterDescriptions.topK} />
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                        <input
+                                            type="number"
+                                            value={settings.topK ?? 40}
+                                            onChange={(e) => {
+                                                const value = Math.min(100, Math.max(1, parseInt(e.target.value) || 1));
+                                                handleSettingsChange({
+                                                    topK: value
+                                                });
+                                            }}
+                                            className="w-12 p-1 text-sm border rounded bg-gray-800 text-gray-200 border-gray-700 text-right"
+                                        />
+                                    </div>
+                                </label>
+                                <input
+                                    type="range"
+                                    min="1"
+                                    max="100"
+                                    value={settings.topK ?? 40}
+                                    onChange={(e) => handleSettingsChange({
+                                        topK: parseInt(e.target.value)
+                                    })}
+                                    className="w-full accent-blue-600"
+                                />
+                            </div>
+
+                            <div className="p-3 bg-gray-800/50 rounded-lg">
+                                <label className="block text-xs font-medium mb-1 flex items-center justify-between text-gray-200">
+                                    <div className="flex items-center">
+                                        <span>Number of Beams</span>
+                                        <InfoIcon content={parameterDescriptions.numBeams} />
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                        <input
+                                            type="number"
+                                            value={settings.numBeams ?? 1}
+                                            onChange={(e) => {
+                                                const value = Math.min(8, Math.max(1, parseInt(e.target.value) || 1));
+                                                handleSettingsChange({
+                                                    numBeams: value
+                                                });
+                                            }}
+                                            className="w-12 p-1 text-sm border rounded bg-gray-800 text-gray-200 border-gray-700 text-right"
+                                        />
+                                    </div>
+                                </label>
+                                <input
+                                    type="range"
+                                    min="1"
+                                    max="8"
+                                    value={settings.numBeams ?? 1}
+                                    onChange={(e) => handleSettingsChange({
+                                        numBeams: parseInt(e.target.value)
+                                    })}
+                                    className="w-full accent-blue-600"
+                                />
+                            </div>
+                            */}
+                        </div>
+
+                        {/* Generation Control */}
+                        <div className="p-3 bg-gray-800/50 rounded-lg space-y-3">
+                            {/* Comment out Seed and Do Sample for now */}
+                            {/* 
+                            <label className="block text-xs font-medium mb-1 flex items-center justify-between text-gray-200">
+                                <div className="flex items-center">
+                                    <span>Seed</span>
+                                    <InfoIcon content={parameterDescriptions.seed} />
+                                </div>
+                                <input
+                                    type="number"
+                                    value={settings.seed}
+                                    onChange={(e) => handleSettingsChange({
+                                        seed: parseInt(e.target.value) || 42
+                                    })}
+                                    className="w-20 p-1 text-sm border rounded bg-gray-800 text-gray-200 border-gray-700 text-right"
+                                />
+                            </label>
+
+                            <Toggle
+                                checked={settings.doSample ?? true}
+                                onChange={(checked) => handleSettingsChange({ doSample: checked })}
+                                label="Do Sample"
+                                description={parameterDescriptions.doSample}
+                            />
+                            */}
+                        </div>
+
+                        {/* Performance Settings */}
+                        <div className="p-3 bg-gray-800/50 rounded-lg space-y-3">
+                                {/* tranformers.js header */}
+                                <label className="block text-xs font-medium mb-1 flex items-center justify-between text-gray-200">
+                               
+                               <div className="flex items-center">
+                                   <span className="text-m font-bold">ONNX Runtime / Transformers.js only</span>
+                                   <span></span>
+                               </div>
+                           </label>
+
+                            {/* WASM Threads */}
+                            <label className="block text-xs font-medium mb-1 flex items-center justify-between text-gray-200">
+                               
+                                <div className="flex items-center">
+                                    <span>WASM Threads</span>
+                                    <InfoIcon content={parameterDescriptions.numThreads} />
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <input
+                                        type="number"
+                                        value={settings.numThreads}
+                                        onChange={(e) => {
+                                            const value = Math.min(16, Math.max(1, parseInt(e.target.value) || 1));
+                                            handleSettingsChange({
+                                                numThreads: value
+                                            });
+                                        }}
+                                        className="w-12 p-1 text-sm border rounded bg-gray-800 text-gray-200 border-gray-700 text-right"
+                                    />
+                                </div>
+                            </label>
+
+                            {/* Quantized Toggle */}
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center">
+                                    <span className="text-xs font-medium text-gray-200">Use Quantized Model</span>
+                                    <InfoIcon content={parameterDescriptions.quantized} />
+                                </div>
+                                <Switch
+                                    checked={settings.quantized ?? true}
+                                    onCheckedChange={(checked) => handleSettingsChange({ quantized: checked })}
+                                />
+                            </div>
+
+                            {/* WebGPU Toggle */}
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center">
+                                    <span className="text-xs font-medium text-gray-200">Use WebGPU</span>
+                                    <InfoIcon content={parameterDescriptions.webGpu} />
+                                </div>
+                                <Switch
+                                    checked={settings.webGpu ?? true}
+                                    onCheckedChange={(checked) => handleSettingsChange({ webGpu: checked })}
+                                />
+                            </div>
+
+                            {/* Transformers.js Optimization Toggles */}
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center">
+                                    <span className="text-xs font-medium text-gray-200">Early Stopping</span>
+                                    <InfoIcon content={parameterDescriptions.earlyStopping} />
+                                </div>
+                                <Switch
+                                    checked={settings.earlyStopping || false}
+                                    onCheckedChange={(checked) => handleSettingsChange({ earlyStopping: checked })}
+                                    disabled={settings.serverUrl !== 'Transformers.js'}
+                                />
+                            </div>
+                            
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center">
+                                    <span className="text-xs font-medium text-gray-200">Stream Progress</span>
+                                    <InfoIcon content={parameterDescriptions.streamProgress} />
+                                </div>
+                                <Switch
+                                    checked={settings.streamProgress || false}
+                                    onCheckedChange={(checked) => handleSettingsChange({ streamProgress: checked })}
+                                    disabled={settings.serverUrl !== 'Transformers.js'}
+                                />
+                            </div>
+                            
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center">
+                                    <span className="text-xs font-medium text-gray-200">Use Cache</span>
+                                    <InfoIcon content={parameterDescriptions.useCache} />
+                                </div>
+                                <Switch
+                                    checked={settings.useCache ?? true}
+                                    onCheckedChange={(checked) => handleSettingsChange({ useCache: checked })}
+                                    disabled={settings.serverUrl !== 'Transformers.js'}
+                                />
+                            </div>
+                            
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center">
+                                    <span className="text-xs font-medium text-gray-200">Return Full Text</span>
+                                    <InfoIcon content={parameterDescriptions.returnFullText} />
+                                </div>
+                                <Switch
+                                    checked={settings.returnFullText || false}
+                                    onCheckedChange={(checked) => handleSettingsChange({ returnFullText: checked })}
+                                    disabled={settings.serverUrl !== 'Transformers.js'}
+                                />
                             </div>
                         </div>
                     </div>

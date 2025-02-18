@@ -12,6 +12,7 @@ import EnhancedInput from './OllamaChat/EnhancedInput';
 import ImportedFiles from './OllamaChat/ImportedFiles';
 import { ImportedFile } from '../utils/fileStorage';
 import ThinkBubble from './OllamaChat/ThinkBubble';
+import { handleTransformersChat } from '../features/transformers/utils/transformersPipeline';
 
 interface OllamaChatProps {
     onClose: () => void;
@@ -30,14 +31,20 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose }) => {
     const [apiSettings, setApiSettings] = useState<APISettings>(() => {
         const lastUsed = getLastUsedConfig();
         return lastUsed || {
-            serverUrl: 'http://localhost:11434/v1/chat/completions',
+            serverUrl: 'http://10.0.0.120:11434/v1/chat/completions',
             model: 'llama3.2',
             apiKey: '',
             temperature: 1.2,
             maxTokens: 8000,
             topP: 1.0,
             frequencyPenalty: 0,
-            presencePenalty: 0
+            presencePenalty: 0,
+            topK: 40,
+            numBeams: 1,
+            seed: 42,
+            quantized: false,
+            webGpu: true,
+            numThreads: navigator.hardwareConcurrency || 4
         };
     });
 
@@ -187,6 +194,10 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose }) => {
         }).join('\n');
     };
 
+    const isTransformersUrl = (url: string): boolean => {
+        return url.toLowerCase() === 'transformers.js';
+    };
+
     const handleSendMessage = async () => {
         if (!input.trim()) return;
 
@@ -220,23 +231,26 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose }) => {
                 messageContent = `${messageContent}\n\nCONTEXT:\n\n${chatHistory}`;
             }
 
-            const response = await fetch(apiSettings.serverUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${apiSettings.apiKey}`
-                },
-                body: JSON.stringify({
-                    model: apiSettings.model,
-                    messages: [{ role: "user", content: messageContent }],
-                    max_tokens: apiSettings.maxTokens,
-                    temperature: apiSettings.temperature,
-                    top_p: apiSettings.topP,
-                    frequency_penalty: apiSettings.frequencyPenalty,
-                    presence_penalty: apiSettings.presencePenalty,
-                    stream: true
-                })
-            });
+            if (isTransformersUrl(apiSettings.serverUrl)) {
+                await handleTransformersChat(messageContent, apiSettings, setMessages);
+            } else {
+                const response = await fetch(apiSettings.serverUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${apiSettings.apiKey}`
+                    },
+                    body: JSON.stringify({
+                        model: apiSettings.model,
+                        messages: [{ role: "user", content: messageContent }],
+                        max_tokens: apiSettings.maxTokens,
+                        temperature: apiSettings.temperature,
+                        top_p: apiSettings.topP,
+                        frequency_penalty: apiSettings.frequencyPenalty,
+                        presence_penalty: apiSettings.presencePenalty,
+                        stream: true
+                    })
+                });
 
             if (!response.ok) {
                 if (response.status === 413) {
@@ -289,11 +303,12 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose }) => {
                                     };
                                 }
 
-                                return newMessages;
-                            });
+                                    return newMessages;
+                                });
+                            }
+                        } catch (e) {
+                            console.error('Error parsing chunk:', e);
                         }
-                    } catch (e) {
-                        console.error('Error parsing chunk:', e);
                     }
                 }
             }
@@ -1091,4 +1106,4 @@ const OllamaChat: React.FC<OllamaChatProps> = ({ onClose }) => {
     );
 };
 
-export default OllamaChat; 
+export default OllamaChat;

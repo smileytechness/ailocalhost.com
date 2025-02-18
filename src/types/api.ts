@@ -1,25 +1,61 @@
-export interface APISettings {
+export interface ChatMessage {
     id?: string;
-    name?: string;
+    content: string;
+    isUser: boolean;
+    timestamp: Date;
+    isError?: boolean;
+    isLoading?: boolean;
+    inferenceProgress?: number;
+    apiSettings?: APISettings;
+}
+
+export interface APISettings {
     serverUrl: string;
-    apiKey: string;
     model: string;
+    apiKey: string;
     temperature: number;
     maxTokens: number;
     topP: number;
+    topK: number;
     frequencyPenalty: number;
     presencePenalty: number;
-    timestamp?: string;
+    numBeams: number;
+    seed: number;
+    quantized: boolean;
+    webGpu: boolean;
+    numThreads: number;
+    minNewTokens?: number;
+    maxTime?: number;
+    repetitionPenalty?: number;
+    lengthPenalty?: number;
+    noRepeatNgramSize?: number;
+    earlyStopping?: boolean;
+    streamProgress?: boolean;
+    useCache?: boolean;
+    returnFullText?: boolean;
+    stopSequences?: string[];
+    id?: string;
 }
 
 export const parameterDescriptions = {
-    temperature: "Controls randomness in responses. Higher values (0.8) make output more random, lower values (0.2) make it more focused.",
+    temperature: "Controls randomness in responses. Higher values (0.8) make output more random, lower values (0.2) make it more focused. Different models have different default values.",
     maxTokens: "Maximum length of response in tokens (roughly 4 characters per token).",
     topP: "Controls diversity via nucleus sampling. Lower values (0.1) make output more focused.",
     frequencyPenalty: "Reduces repetition by lowering probability of words that have already appeared.",
     presencePenalty: "Encourages new topics by increasing probability of less-used words.",
     model: "The name of the model to use for generating responses.",
-    apiKey: "Enter your API key for cloud provider (OpenAI, Anthropic, Google, Groq etc."
+    apiKey: "Enter your API key for cloud provider (OpenAI, Anthropic, Google, Groq etc.",
+    topK: "Controls vocabulary diversity (1-100). Lower values (e.g., 10) = more focused, predictable text. Higher values (e.g., 50) = more diverse vocabulary.",
+    numBeams: "Number of search beams (1-8). Higher values explore more possibilities but increase generation time. 1 = greedy search, 4+ = more thorough but slower.",
+    seed: "Random seed for reproducible generation (0-999999). Same seed + same input = same output. Set to 0 for random results.",
+    numThreads: "WASM processing threads (1-16). More threads can improve speed but use more CPU. Recommended: 4 for most devices, 8+ for high-end CPUs.",
+    // doSample: "Toggle between sampling (ON) and greedy generation (OFF). ON = more creative, varied outputs. OFF = more deterministic, consistent outputs.",
+    quantized: "Toggle model quantization. ON = reduced memory usage, faster loading, slightly lower quality. OFF = full precision, higher quality, more memory.",
+    webGpu: "Transformers.js only: Toggle WebGPU acceleration. ON = faster processing when GPU available. OFF = CPU-only processing. Requires browser WebGPU support.",
+    earlyStopping: "Transformers.js only: Stop generation early if a high-quality output is found. Can speed up responses but may reduce thoroughness.",
+    streamProgress: "Transformers.js only: Show detailed progress during model loading and text generation. May slightly impact performance.",
+    useCache: "Transformers.js only: Cache models in browser memory for faster subsequent use. Uses more memory but improves response time.",
+    returnFullText: "Transformers.js only: Include input prompt in response. Useful for maintaining context but may count against token limits."
 };
 
 export const serverStatusDescriptions = {
@@ -123,4 +159,17 @@ For cloud services (OpenAI, Anthropic, Groq, etc.):
 For local servers:
 • Check if authentication is required
 • Verify your authentication settings`
+};
+
+export const validateAndNormalizeSettings = (settings: APISettings): APISettings => {
+    return {
+        ...settings,
+        temperature: Math.max(0.1, Math.min(settings.temperature, 2.0)),
+        maxTokens: Math.max(1, Math.min(settings.maxTokens, 2048)),
+        topP: Math.max(0.1, Math.min(settings.topP, 1.0)),
+        topK: Math.max(1, Math.min(settings.topK || 40, 100)),
+        numThreads: Math.min(settings.numThreads || navigator.hardwareConcurrency || 4, 16),
+        frequencyPenalty: Math.max(0, Math.min(settings.frequencyPenalty, 2.0)),
+        presencePenalty: Math.max(0, Math.min(settings.presencePenalty, 2.0))
+    };
 };

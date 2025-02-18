@@ -1,4 +1,5 @@
-import { env } from '@huggingface/transformers';
+import { env, pipeline } from '@huggingface/transformers';
+import type { PipelineType as HFPipelineType } from '@huggingface/transformers';
 import { logTransformersActivity } from '../components/TransformersConsoleOutput';
 import { formatBytes } from './transformersUtils';
 
@@ -30,7 +31,10 @@ export const listCachedModels = async () => {
     const keys = await cache.keys();
     
     // Group files by model ID
-    const modelFiles = new Map<string, { files: Array<{ name: string; size: number }> }>();
+    const modelFiles = new Map<string, { 
+        files: Array<{ name: string; size: number }>;
+        pipelineType?: string;
+    }>();
     
     for (const key of keys) {
         const response = await cache.match(key);
@@ -45,14 +49,18 @@ export const listCachedModels = async () => {
         if (resolveIndex >= 2) {
             modelId = `${pathParts[resolveIndex - 2]}/${pathParts[resolveIndex - 1]}`;
         } else {
-            continue; // Skip if we can't parse the model ID
+            continue;
         }
 
         const fileName = pathParts[pathParts.length - 1];
         const size = (await response.blob()).size;
 
         if (!modelFiles.has(modelId)) {
-            modelFiles.set(modelId, { files: [] });
+            const pipelineType = await getPipelineFromConfig(modelId);
+            modelFiles.set(modelId, { 
+                files: [],
+                pipelineType: pipelineType || undefined
+            });
         }
         
         modelFiles.get(modelId)?.files.push({
@@ -65,7 +73,8 @@ export const listCachedModels = async () => {
     return Array.from(modelFiles.entries()).map(([modelId, data]) => ({
         modelId,
         files: data.files,
-        totalSize: data.files.reduce((sum, file) => sum + file.size, 0)
+        totalSize: data.files.reduce((sum, file) => sum + file.size, 0),
+        pipelineType: data.pipelineType
     }));
 };
 
@@ -182,11 +191,15 @@ export async function importLocalModel(file: File): Promise<{ path: string; size
         const modelResponse = new Response(file);
         await cache.put(`${cachePath}/model.onnx`, modelResponse);
 
-        // Create a basic config.json
+        // Detect pipeline type
+        const pipelineType = await detectAndStorePipelineType(modelId);
+
+        // Create a basic config.json with pipeline type
         const config = {
             model_type: 'custom',
             architectures: ['CustomModel'],
-            format: 'onnx'
+            format: 'onnx',
+            pipeline_type: pipelineType
         };
         const configResponse = new Response(JSON.stringify(config));
         await cache.put(`${cachePath}/config.json`, configResponse);
@@ -194,7 +207,7 @@ export async function importLocalModel(file: File): Promise<{ path: string; size
         logTransformersActivity({
             type: 'success',
             message: `Imported model: ${file.name}`,
-            details: `Size: ${formatBytes(file.size)}`
+            details: `Size: ${formatBytes(file.size)}${pipelineType ? `, Pipeline: ${pipelineType}` : ''}`
         });
 
         return {
@@ -209,4 +222,73 @@ export async function importLocalModel(file: File): Promise<{ path: string; size
         });
         throw error;
     }
-} 
+}
+
+// Helper function to get pipeline type from config
+export const getPipelineFromConfig = async (modelId: string): Promise<HFPipelineType | null> => {
+    const cache = await caches.open('transformers-cache');
+    const configResponse = await cache.match(`${modelId}/config.json`);
+    if (configResponse) {
+        const config = await configResponse.json();
+        return config.pipeline_type || null;
+    }
+    return null;
+};
+
+// Define supported pipeline types - this is not complete, and does not seen to affect anything
+const PIPELINE_TYPES: HFPipelineType[] = [
+    'text-generation',
+    'text-classification',
+    'token-classification',
+    'question-answering',
+    'summarization',
+    'translation',
+    'image-classification',
+    'image-segmentation',
+    'object-detection',
+    'image-to-text',
+    'automatic-speech-recognition',
+    'text-to-speech',
+    'audio-classification',
+    'feature-extraction',
+    'fill-mask'
+    // Remove unsupported pipeline types
+];
+
+type PipelineType = HFPipelineType;
+
+// Detect pipeline type and store in config
+export const detectAndStorePipelineType = async (modelId: string): Promise<PipelineType | null> => {
+    try {
+        // Try each pipeline type until one works
+        for (const pipelineType of PIPELINE_TYPES) {
+            try {
+                await pipeline(
+                    pipelineType, 
+                    modelId
+                );
+                
+                // If we get here, the pipeline type works
+                // Update the config.json with the detected pipeline
+                const cache = await caches.open('transformers-cache');
+                const configResponse = await cache.match(`${modelId}/config.json`);
+                if (configResponse) {
+                    const config = await configResponse.json();
+                    config.pipeline_type = pipelineType;
+                    await cache.put(
+                        `${modelId}/config.json`, 
+                        new Response(JSON.stringify(config))
+                    );
+                }
+                
+                return pipelineType;
+            } catch {
+                continue; // Try next pipeline type
+            }
+        }
+        return null;
+    } catch (error) {
+        console.error('Error detecting pipeline type:', error);
+        return null;
+    }
+}; 
