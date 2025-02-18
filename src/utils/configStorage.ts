@@ -4,14 +4,32 @@ import { APISettings } from '../types/api';
 const STORAGE_KEY = 'ollama_saved_configs';
 const LAST_USED_KEY = 'ollama_last_used_config';
 
+export const DEFAULT_SETTINGS: APISettings = {
+    serverUrl: '',
+    apiKey: '',
+    model: '',
+    temperature: 0.7,
+    maxTokens: 2000,
+    topP: 1,
+    frequencyPenalty: 0,
+    presencePenalty: 0,
+    // Add new default values
+    topK: 40,
+    numBeams: 1,
+    seed: 42,
+    numThreads: 4,
+    quantized: false,
+    webGpu: true
+};
+
 export const loadSavedConfigs = (): APISettings[] => {
     const savedConfigs = localStorage.getItem(STORAGE_KEY);
     const configs = savedConfigs ? JSON.parse(savedConfigs) : [];
     
     // Sort by timestamp in descending order (most recent first)
     return configs.sort((a: APISettings, b: APISettings) => {
-        const timeA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
-        const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+        const timeA = (a as any).timestamp ? new Date((a as any).timestamp).getTime() : 0;
+        const timeB = (b as any).timestamp ? new Date((b as any).timestamp).getTime() : 0;
         return timeB - timeA;
     });
 };
@@ -56,7 +74,7 @@ export const getLastUsedConfig = (): APISettings | null => {
 
 export const deleteConfig = (id: string): void => {
     const configs = loadSavedConfigs();
-    const newConfigs = configs.filter(c => c.id !== id);
+    const newConfigs = configs.filter(c => (c as any).id !== id);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(newConfigs));
     
     // Dispatch storage event for other components

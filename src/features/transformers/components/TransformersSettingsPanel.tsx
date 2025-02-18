@@ -230,6 +230,7 @@ interface TransformersSettingsProps {
 
 const PIPELINE_TYPES = [
     'audio-classification',
+    //'any-to-any',
     'automatic-speech-recognition',
     'depth-estimation',
     'document-question-answering',
@@ -240,6 +241,7 @@ const PIPELINE_TYPES = [
     'image-segmentation',
     'image-to-image',
     'image-to-text',
+    //'multi-modality',
     'object-detection',
     'question-answering',
     'summarization',
@@ -279,8 +281,20 @@ const PIPELINE_DESCRIPTIONS: Record<string, string> = {
     'zero-shot-audio-classification': 'Classify audio without prior training',
     'zero-shot-classification': 'Classify text without prior training',
     'zero-shot-image-classification': 'Classify images without prior training',
-    'zero-shot-object-detection': 'Detect objects without prior training'
+    'zero-shot-object-detection': 'Detect objects without prior training',
+    'multi_modality': 'Multi-modality pipeline supports any input to any output - images, text, audio video etc',
 };
+
+// Add this constant for dtype options
+const DTYPE_OPTIONS = [
+    { value: 'fp32', label: 'fp32 (float32)', description: 'Most accurate, best for debugging and development' },
+    { value: 'fp16', label: 'fp16 (float16)', description: 'Balanced performance, good for GPU inference' },
+    { value: 'int8', label: 'int8', description: 'Low precision, ideal for resource-constrained environments' },
+    { value: 'q8', label: 'q8 (quantized int8 - default)', description: 'Optimized for WASM devices and edge computing' },
+    { value: 'q16', label: 'q16 (quantized int16)', description: 'High-precision quantization, good for medical/audio processing' }
+] as const;
+
+type DType = typeof DTYPE_OPTIONS[number]['value'] | '';
 
 const TransformersSettings: React.FC<TransformersSettingsProps> = ({
     isExpanded: propIsExpanded,
@@ -292,6 +306,7 @@ const TransformersSettings: React.FC<TransformersSettingsProps> = ({
     const [isModelsExpanded, setIsModelsExpanded] = useState(false);
     const [modelUrl, setModelUrl] = useState('');
     const [selectedPipeline, setSelectedPipeline] = useState<PipelineType | ''>('');
+    const [selectedDtype, setSelectedDtype] = useState<DType>('');
     const [downloadState, setDownloadState] = useState<DownloadState>({
         isDownloading: false,
         progress: 0,
@@ -863,7 +878,7 @@ Copy the model name, and be sure to note the correct pipline classification to d
                                 type="text"
                                 value={modelUrl}
                                 onChange={(e) => setModelUrl(e.target.value)}
-                                placeholder="e.g. Xenova/whisper-base"
+                                placeholder="e.g. onnx-community/Qwen2.5-0.5B-Instruct-ONNX-MHA"
                                 className="flex-1 p-1.5 text-sm border rounded bg-gray-800 text-gray-200 border-gray-700"
                             />
                         </div>
@@ -895,6 +910,48 @@ Copy the model name, and be sure to note the correct pipline classification to d
                                 </div>
                             </div>
                         </div>
+
+                        {/* dtype Selection */}
+                        <div className="flex items-center">
+                            <label className="text-xs font-medium text-gray-200 w-24 flex items-center gap-1">
+                                dtype
+                                <Tooltip content={`Select the data type for model operations:
+                                    
+- fp32: Most accurate, best for debugging
+- fp16: Balanced performance, good for GPUs
+- int8: Low precision, for resource-constrained environments
+- q8: Optimized for WASM devices (default)
+- q16: High-precision quantization
+
+Leave blank to use model defaults.`}>
+                                    <FiInfo className="w-3.5 h-3.5 text-gray-500" />
+                                </Tooltip>
+                            </label>
+                            <div className="flex-1 relative">
+                                <select
+                                    value={selectedDtype}
+                                    onChange={(e) => setSelectedDtype(e.target.value as DType)}
+                                    className="w-full p-1.5 text-sm border rounded bg-gray-800 text-gray-200 border-gray-700 appearance-none"
+                                >
+                                    <option value="">Auto-detect</option>
+                                    {DTYPE_OPTIONS.map((dtype) => (
+                                        <option key={dtype.value} value={dtype.value} className="text-gray-200">
+                                            {dtype.label}
+                                        </option>
+                                    ))}
+                                </select>
+                                <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                                    <FiChevronDown className="h-4 w-4 text-gray-400" />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* dtype Description */}
+                        {selectedDtype && (
+                            <div className="text-[10px] text-gray-400 mt-1 text-right">
+                                {DTYPE_OPTIONS.find(d => d.value === selectedDtype)?.description}
+                            </div>
+                        )}
 
                         {/* Pipeline Description */}
                         {selectedPipeline && (
